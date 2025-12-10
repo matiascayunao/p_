@@ -4,55 +4,52 @@ from .models import Ubicacion, TipoLugar, TipoObjeto, Lugar, Objeto, ObjetoLugar
 
 
 
-class SectorInline(nested_admin.NestedStackedInline):
-    model = Sector
+class HistoricoObjetoInline(nested_admin.NestedTabularInline):
+    model = HistoricoObjeto
     extra = 0
-class UbicacionInline(nested_admin.NestedStackedInline):
-    model = Ubicacion
+class ObjetoLugarInline(nested_admin.NestedTabularInline):
+    model = ObjetoLugar
     extra = 0
-    inlines = [SectorInline]
-class TipoLugarInline(nested_admin.NestedStackedInline):
-    model = TipoLugar
-    extra = 0
-    inline=[UbicacionInline]
+    inlines = [HistoricoObjetoInline]
+
 class LugarInline(nested_admin.NestedStackedInline):
     model = Lugar
     extra = 0
-    inline = [TipoLugarInline]
+    inlines= [ObjetoLugarInline]
 
-class CategoriaInline(nested_admin.NestedStackedInline):
-    model = CategoriaObjeto
+class UbicacionInline(nested_admin.NestedStackedInline):
+    model = Ubicacion
     extra = 0
+    inlines = [LugarInline]
+
+class SectorAdmin(nested_admin.NestedModelAdmin):
+    inlines = [UbicacionInline]    
+    list_display = ("sector",)
+    search_fields=("sector",)
+
+
+class TipoObjetoInline(nested_admin.NestedTabularInline):
+    model = TipoObjeto
+    extra = 0
+
 class ObjetoInline(nested_admin.NestedStackedInline):
     model = Objeto
     extra = 0
-    inline=[CategoriaInline]
-class TipoObjetoInline(nested_admin.NestedStackedInline):
-    model = TipoObjeto
-    extra = 0
-    inline=[ObjetoInline]
+    inlines = [TipoObjetoInline]
 
-class ObjetoLugarInline(nested_admin.NestedStackedInline):
-    model = ObjetoLugar
-    extra = 0
-    inline = [LugarInline, TipoObjetoInline]
-
-class HistoricoObjetoInline(nested_admin.NestedStackedInline):
-    model = HistoricoObjeto
-    inline=[ObjetoInline]
-
-class StoreAdmin(nested_admin.NestedModelAdmin):
-    inlines=[]
-    
+class CategoriaObjetoAdmin(nested_admin.NestedModelAdmin):
+    inlines = [ObjetoInline]
+    list_display= ("nombre_de_la_categoria",)
+    search_fields=("nombre_de_la_categoria",)
 
 
+admin.site.register(Sector, SectorAdmin)
+
+admin.site.register(CategoriaObjeto, CategoriaObjetoAdmin)
 
 admin.site.register(Ubicacion)
-admin.site.register(Sector)
 admin.site.register(TipoLugar)
 admin.site.register(Lugar)
-
-admin.site.register(CategoriaObjeto)
 admin.site.register(Objeto)
 admin.site.register(TipoObjeto)
 admin.site.register(ObjetoLugar)
