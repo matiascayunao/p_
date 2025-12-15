@@ -1,6 +1,6 @@
 from django.contrib import admin
 import nested_admin
-from .models import Ubicacion, TipoLugar, TipoObjeto, Lugar, Objeto, ObjetoLugar, CategoriaObjeto,HistoricoObjeto, Sector
+from .models import Ubicacion, TipoLugar, TipoObjeto, Lugar, Objeto, ObjetoLugar, CategoriaObjeto,HistoricoObjeto, Sector, Piso
 
 
 
@@ -17,10 +17,16 @@ class LugarInline(nested_admin.NestedStackedInline):
     extra = 0
     inlines= [ObjetoLugarInline]
 
+class PisoInline(nested_admin.NestedStackedInline):
+    model = Piso
+    extra = 0
+    inlines=[LugarInline]
+
 class UbicacionInline(nested_admin.NestedStackedInline):
     model = Ubicacion
     extra = 0
-    inlines = [LugarInline]
+    inlines = [PisoInline]
+
 
 class SectorAdmin(nested_admin.NestedModelAdmin):
     inlines = [UbicacionInline]    
@@ -50,6 +56,7 @@ admin.site.register(CategoriaObjeto, CategoriaObjetoAdmin)
 admin.site.register(Ubicacion)
 admin.site.register(TipoLugar)
 admin.site.register(Lugar)
+admin.site.register(Piso)
 admin.site.register(Objeto)
 admin.site.register(TipoObjeto)
 admin.site.register(ObjetoLugar)

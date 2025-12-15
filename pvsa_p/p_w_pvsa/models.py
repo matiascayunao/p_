@@ -10,8 +10,16 @@ class Sector(models.Model):
 class Ubicacion(models.Model):
     ubicacion = models.CharField(max_length=100)
     sector = models.ForeignKey(Sector, verbose_name="Sector", on_delete=models.RESTRICT)
+
     def __str__(self):
         return self.ubicacion
+    
+class Piso(models.Model):
+    piso = models.SmallIntegerField()
+    ubicacion = models.ForeignKey(Ubicacion, verbose_name="Ubicacion", on_delete=models.RESTRICT)
+
+    def __str__(self):
+        return f"{self.piso}, {self.ubicacion}"
     
 class TipoLugar(models.Model):
     tipo_de_lugar = models.CharField(max_length=100)
@@ -21,7 +29,7 @@ class TipoLugar(models.Model):
 
 class Lugar(models.Model):
     nombre_del_lugar = models.CharField(max_length=100) #100 o 150?
-    ubicacion = models.ForeignKey(Ubicacion, verbose_name="Ubicacion", on_delete=models.RESTRICT)
+    piso = models.ForeignKey(Piso, verbose_name="Piso", on_delete=models.RESTRICT)
 
     lugar_tipo_lugar = models.ForeignKey(TipoLugar, verbose_name="Tipo de lugar", on_delete=models.RESTRICT)
 
@@ -61,8 +69,8 @@ class ObjetoLugar(models.Model):
     }
     cantidad = models.SmallIntegerField()
     estado = models.CharField(max_length=1, choices=ESTADO)
-    detalle = models.CharField(max_length=200)
-    fecha = models.DateField()
+    detalle = models.CharField(max_length=200, blank=True)
+    fecha = models.DateField(auto_now_add=True)
 
     lugar= models.ForeignKey(Lugar, verbose_name= "Lugar", on_delete=models.RESTRICT)
     tipo_de_objeto = models.ForeignKey(TipoObjeto, verbose_name="Tipo de objeto", on_delete=models.RESTRICT)
@@ -78,7 +86,7 @@ class HistoricoObjeto(models.Model):
     }
     cantidad_anterior =models.SmallIntegerField()
     estado_anterior = models.CharField(max_length=1, choices=ESTADO)
-    detalle_anterior= models.CharField(max_length=200)
+    detalle_anterior= models.CharField(max_length=200, blank=True)
     fecha_anterior = models.DateField()
 
     objeto_del_lugar = models.ForeignKey(ObjetoLugar, verbose_name="Objeto del lugar", on_delete=models.RESTRICT ,null=True, blank=True)
