@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1>listado de sectores</h1>
+
+
+<ul>
+    {% for sector in sectores %}
+    <li>
+        <a href="{% url 'detalle_sector' sector.id %}">
+            {{sector.sector}}
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+{% endblock %}

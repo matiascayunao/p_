@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+
+{% block content %}
+<h1>{{sector.sector}}</h1>
+
+<h2>ubicaciones</h2>
+<ul>
+    {% for u in ubicaciones %}
+        <li>
+            <a href="{% url 'detalle_ubicacion' u.id %}">
+                {{u.ubicacion}}
+            </a>
+        </li>
+    {% empty %}
+    <li>
+        vacio
+    </li>
+    {% endfor %}
+</ul>
+
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+
+{% block content %}
+    <h1>crear sector</h1>
+
+    <form method="post">
+            {% csrf_token %}
+            {{form.as_p}}
+
+            <button>
+                Guardar
+            </button>
+    </form>
+{% endblock%}
