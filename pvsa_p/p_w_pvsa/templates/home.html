@@ -1,9 +1,40 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<div class="container py-5">
+    {% if error %}
+        <div class="alert alert-danger">
+            {{error}}
+        </div>
+    {% endif %}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+            <h2 class="mb-1">Home</h2>
+            <p class="text-muted mb-0">Accesos rápidos del sistema.</p>
+        </div>
+    </div>
 
-<h1>home</h1>
+    <div class="row g-3">
+        <div class="col-12 col-md-6">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="card-title mb-2">Sectores</h5>
+                    <p class="card-text text-muted">Ver listado y entrar a sus ubicaciones.</p>
+                    <a href="{% url 'lista_sectores' %}" class="btn btn-outline-primary">Ir a Sectores</a>
+                    <a href="{% url 'crear_sector' %}" class="btn btn-primary ms-2">Crear sector</a>
+                </div>
+            </div>
+        </div>
 
-{{error}}
-
+        <div class="col-12 col-md-6">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="card-title mb-2">Ubicaciones</h5>
+                    <p class="card-text text-muted">Listado general de ubicaciones</p>
+                    <a href="{% url 'lista_ubicaciones'%}" class="btn btn-outline-primary">Ir a ubicaciones</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

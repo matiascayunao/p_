@@ -1,5 +1,35 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1>listado de ubicaciones</h1>
+
+<div class="container py-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+            <h2 class="mb-0">Ubicaciones</h2>
+            <div class="text-muted">Listado de ubicaciones</div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            {% if ubicaciones %}
+            <div class="list-group list-group-flush">
+                {% for u in ubicaciones %}
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="{% url 'detalle_ubicacion' u.id %}">
+                    <span>{{u.ubicacion}}</span>
+                    <span class="text-muted">Ver &raquo;</span>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="p-4">
+                <div class="alert alert-secondary mb-0">
+                    No hay ubicaciones registradas.
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
 {% endblock %}

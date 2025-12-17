@@ -2,21 +2,42 @@
 
 
 {% block content %}
-<h1>{{sector.sector}}</h1>
+<div class="container py-4">
+    <div class="mb-3">
+        <a href="{% url 'lista_sectores' %}" class="btn btn-outline-secondary">&laquo; Volver</a>
+    </div>
 
-<h2>ubicaciones</h2>
-<ul>
-    {% for u in ubicaciones %}
-        <li>
-            <a href="{% url 'detalle_ubicacion' u.id %}">
-                {{u.ubicacion}}
-            </a>
-        </li>
-    {% empty %}
-    <li>
-        vacio
-    </li>
-    {% endfor %}
-</ul>
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <h2 class="mb-0">{{sector.sector}}</h2>
+        
+        <div class="text-muted">Detalle del sector</div>
+        </div>
+    </div>
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <h4 class="mb-0">Ubicaciones</h4>
+        <a href="{% url 'lista_ubicaciones' %}" class="btn btn-outline-primary btn-sm" >Ver todas</a>
+    </div>
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            {% if ubicaciones %}
+                <div class="list-group list-group-flush">
+                    {% for u in ubicaciones %}
+                    <a class = "list-group-item list-group-item-action d-flex justify-content-between align-items-center" 
+                    href="{% url 'detalle_ubicacion' u.id %}">
+                    <span>{{u.ubicacion}}</span>
+                    <span class="text-muted">Abrir &raquo;</span></a>
+                    {% endfor %}
+                </div>
+            {% else %}
+            <div class="p-4">
+                <div class="alert alert-secondary mb-0">
+                    Este sector no tiene ubicaciones registradas.
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
 
 {% endblock %}

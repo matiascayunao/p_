@@ -24,8 +24,7 @@ urlpatterns= [
 
     path("pisos/<int:piso_id>/", views.detalle_piso, name="detalle_piso"),
 
-   ## path("lugar/<int:lugar_id/", views.detalle_lugar, name="detalle_lugar"),
+    path("lugar/<int:lugar_id>/", views.detalle_lugar, name="detalle_lugar"),
 
-    path("detalle_lugar/", views.detalle_lugar, name="detalle_lugar"),
 
 ]

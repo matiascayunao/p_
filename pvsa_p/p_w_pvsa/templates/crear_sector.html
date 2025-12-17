@@ -2,14 +2,41 @@
 
 
 {% block content %}
-    <h1>crear sector</h1>
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-6 col-lg-5">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <h3 class="mb-1">Crear sector</h3>
+                    <p class="text-muted mb-4"> Ingresa el nombre del sector.</p>
+                    <form method="post">
+                        {% csrf_token %}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {{form.non_field_errors}}
+                            </div>
+                        {% endif %}
 
-    <form method="post">
-            {% csrf_token %}
-            {{form.as_p}}
+                        <div class="mb-3">
+                            <label class="form-label" for="{{form.sector.id_for_label}}">Sector</label>
+                            {{form.sector}}
+                            {% if form.sector.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{form.sector.errors|striptags}}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                Guardar
+                            </button>
+                            <a href="{% url 'home' %}" class="btn btn-outline-secondary">Cancelar</a>
 
-            <button>
-                Guardar
-            </button>
-    </form>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock%}
