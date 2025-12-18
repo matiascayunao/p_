@@ -12,7 +12,7 @@
     </div>
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-body">
-            <h2 class="mb-1">Piso {{piso.piso}}</h2>
+            <h2 class="mb-1">Piso {{sector.sector}}</h2>
             {% if piso.ubicacion %}
             <div class="text-muted">
                 Ubicación: {{piso.ubicacion}} | Sector: {{piso.ubicacion.sector}}
@@ -36,7 +36,7 @@
                 <div class="list-group list-group-flush">
                     {% for l in lugares %}
                         <a href="{% url 'detalle_lugar' lugar_id=l.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <span>{{l.nombre_del_lugar}} (id={{l.id}})</span>
+                            <span>{{l.nombre_del_lugar}} </span>
                             <span class="text-muted">Abrir &raquo;</span>
                         </a>
                     {% endfor %}

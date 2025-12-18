@@ -4,40 +4,37 @@
 {% block content %}
 <div class="container py-4">
     <div class="mb-3">
-        <a href="{% url 'lista_sectores' %}" class="btn btn-outline-secondary">&laquo; Volver</a>
+        <a href="{% url 'lista_ubicaciones' %}" class="btn btn-outline-secondary">&laquo; Volver</a>
     </div>
-
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-body">
-            <h2 class="mb-0">{{sector.sector}}</h2>
-        
-        <div class="text-muted">Detalle del sector</div>
+            <h2 class="mb-0">{{ubicacion.ubicacion}}</h2>
+            <div class="text-muted">
+                Sector: {{ubicacion.sector}}
+            </div>
         </div>
     </div>
-    <div class="d-flex align-items-center justify-content-between mb-2">
-        <h4 class="mb-0">Ubicaciones</h4>
-        <a href="{% url 'lista_ubicaciones' %}" class="btn btn-outline-primary btn-sm" >Ver todas</a>
-    </div>
+
+    <h4 class="mb-2">Pisos</h4>
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
-            {% if ubicaciones %}
+            {% if pisos %}
                 <div class="list-group list-group-flush">
-                    {% for u in ubicaciones %}
-                    <a class = "list-group-item list-group-item-action d-flex justify-content-between align-items-center" 
-                    href="{% url 'detalle_ubicacion' u.id %}">
-                    <span>{{u.ubicacion}}</span>
-                    <span class="text-muted">Abrir &raquo;</span></a>
+                    {% for p in pisos %}
+                    <a href="{% url 'detalle_piso' p.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <span>Piso {{p.piso}}</span>
+                        <span class="text-muted">Abrir &raquo;</span>
+                    </a>
                     {% endfor %}
                 </div>
             {% else %}
-            <div class="p-4">
-                <div class="alert alert-secondary mb-0">
-                    Este sector no tiene ubicaciones registradas.
+                <div class="p-4">
+                    <div class="alert alert-secondary mb-0">
+                        Esta ubicación no tiene pisos cargados
+                    </div>
                 </div>
-            </div>
             {% endif %}
         </div>
     </div>
 </div>
-
 {% endblock %}
