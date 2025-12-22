@@ -6,14 +6,17 @@
     <div class="mb-3">
         <a href="{% url 'lista_ubicaciones' %}" class="btn btn-outline-secondary">&laquo; Volver</a>
     </div>
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-            <h2 class="mb-0">{{ubicacion.ubicacion}}</h2>
-            <div class="text-muted">
-                Sector: {{ubicacion.sector}}
-            </div>
-        </div>
+    <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h2 class="mb-0">{{ ubicacion.ubicacion }}</h2>
+      <div class="text-muted">Sector: {{ ubicacion.sector.sector }}</div>
     </div>
+
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-primary" href="{% url 'editar_ubicacion' ubicacion.id %}">Editar</a>
+      <a class="btn btn-outline-danger" href="{% url 'borrar_ubicacion' ubicacion.id %}">Borrar</a>
+    </div>
+  </div>
 
     <h4 class="mb-2">Pisos</h4>
     <div class="card shadow-sm border-0">

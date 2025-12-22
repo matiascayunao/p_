@@ -1,97 +1,88 @@
-from django.contrib import admin
-from django.urls import path, include
-from django.contrib.auth import views as auth_views
-
+from django.urls import path
 from . import views
 
-urlpatterns= [
+urlpatterns = [
 
-    path("signin/", views.signin, name="signin"),
-    path("logout/", views.signout, name="logout"),
-    path("signup/", views.signup, name="signup"),
-
-
-    path("admin/", admin.site.urls),
+    path("excel/sectores/",views.descargar_excel_sectores, name="descargar_excel_sectores"),
+    # Auth
     path("", views.home, name="home"),
+    path("signin/", views.signin, name="signin"),
+    path("signup/", views.signup, name="signup"),
+    path("logout/", views.signout, name="signout"),
 
-    ## SECTORES 
+    # SECTOR
     path("sectores/", views.lista_sectores, name="lista_sectores"),
-    path("sectores/<int:sector_id>/", views.detalle_sector, name="detalle_sector"),
-    path("sectores/<int:sector_id>/borrar/", views.borrar_sector, name="borrar_sector"),
     path("sector/crear/", views.crear_sector, name="crear_sector"),
+    path("sectores/<int:sector_id>/", views.detalle_sector, name="detalle_sector"),
     path("sectores/<int:sector_id>/editar/", views.editar_sector, name="editar_sector"),
+    path("sectores/<int:sector_id>/borrar/", views.borrar_sector, name="borrar_sector"),
 
-    ## UBICACIONES
+    # UBICACION
     path("ubicaciones/", views.lista_ubicaciones, name="lista_ubicaciones"),
-    path("ubicaciones/<int:ubicacion_id>/", views.detalle_ubicacion, name="detalle_ubicacion"),
-    path("ubicaciones/<int:ubicacion_id>/borrar", views.borrar_ubicacion, name="borrar_ubicacion"),
     path("ubicacion/crear/", views.crear_ubicacion, name="crear_ubicacion"),
+    path("ubicaciones/<int:ubicacion_id>/", views.detalle_ubicacion, name="detalle_ubicacion"),
     path("ubicaciones/<int:ubicacion_id>/editar/", views.editar_ubicacion, name="editar_ubicacion"),
+    path("ubicaciones/<int:ubicacion_id>/borrar/", views.borrar_ubicacion, name="borrar_ubicacion"),
 
-    ## PISOS
-    path("pisos/<int:piso_id>/", views.detalle_piso, name="detalle_piso"),
-    path("pisos/<int:piso_id>/borrar", views.borrar_piso, name="borrar_piso"),
+    # PISO
+    path("pisos/", views.lista_pisos, name="lista_pisos"),
     path("piso/crear/", views.crear_piso, name="crear_piso"),
-    path("pisos/", views.crear_piso, name="listar_piso"),
-    path("pisos/<int:piso_id>/editar/", views.EditarPiso, name="editar_piso"),
+    path("pisos/<int:piso_id>/", views.detalle_piso, name="detalle_piso"),
+    path("pisos/<int:piso_id>/editar/", views.editar_piso, name="editar_piso"),
+    path("pisos/<int:piso_id>/borrar/", views.borrar_piso, name="borrar_piso"),
 
-    ## LUGAR
-    path("lugar/<int:lugar_id>/", views.detalle_lugar, name="detalle_lugar"),
-    path("lugar/<int:lugar_id>/borrar", views.borrar_lugar, name="borrar_lugar"),
-    path("lugar/<int:lugar_id>/editar", views.editar_lugar, name="editar_lugar"),
+    # LUGAR
+    path("lugares/", views.lista_lugares, name="lista_lugares"),
     path("lugar/crear/", views.crear_lugar, name="crear_lugar"),
-    path("lugares/", views.crear_lugar, name="listar_lugar"),
+    path("lugar/<int:lugar_id>/", views.detalle_lugar, name="detalle_lugar"),
+    path("lugar/<int:lugar_id>/editar/", views.editar_lugar, name="editar_lugar"),
+    path("lugar/<int:lugar_id>/borrar/", views.borrar_lugar, name="borrar_lugar"),
 
-    ## OBJETO DEL LUGAR
+    # OBJETO DEL LUGAR
+    path("objetos-lugar/", views.lista_objetos_lugar, name="lista_objetos_lugar"),
+    path("objetos-lugar/<int:objeto_lugar_id>/", views.detalle_objeto_lugar, name="detalle_objeto_lugar"),
+    path("objetos-lugar/<int:objeto_lugar_id>/editar/", views.editar_objeto_lugar, name="editar_objeto_lugar"),
+    path("objetos-lugar/<int:objeto_lugar_id>/borrar/", views.borrar_objeto_lugar, name="borrar_objeto_lugar"),
     path("lugar/<int:lugar_id>/objeto/crear/", views.crear_objeto_lugar, name="crear_objeto_lugar"),
-    path("lugar/<int:lugar_id>/objeto/crear/", views.crear_objeto_lugar, name="detalle_objeto_lugar"),
-    path("lugar/objetos/", views.crear_objeto_lugar, name="listar_objeto_lugar"),
-    path("lugar/<int:lugar_id>/objeto/editar/", views.editar_objeto_lugar, name="editar_objeto_lugar"),
-    path("lugar/<int:lugar_id>/objeto/borrar/", views.borrar_objeto_lugar, name="borrar_objeto_lugar"),
 
-
-
-    ## TIPO DEL LUGAR
+    # TIPO LUGAR
+    path("tipo-lugar/", views.lista_tipos_lugar, name="lista_tipos_lugar"),
     path("tipo-lugar/crear/", views.crear_tipo_lugar, name="crear_tipo_lugar"),
-    path("", views.crear_tipo_lugar, name="detalle_tipo_lugar"),
-    path("tipo-lugar/", views.crear_tipo_lugar, name="listar_tipo_lugar"),
+    path("tipo-lugar/<int:tipo_lugar_id>/", views.detalle_tipo_lugar, name="detalle_tipo_lugar"),
     path("tipo-lugar/<int:tipo_lugar_id>/editar/", views.editar_tipo_lugar, name="editar_tipo_lugar"),
     path("tipo-lugar/<int:tipo_lugar_id>/borrar/", views.borrar_tipo_lugar, name="borrar_tipo_lugar"),
 
-
-    ## CATEGORIA
+    # CATEGORIA
+    path("categorias/", views.lista_categorias, name="lista_categorias"),
     path("categoria/crear/", views.crear_categoria_objeto, name="crear_categoria_objeto"),
-    path("categoria/crear/", views.crear_categoria_objeto, name="detalle_categoria_objeto"),
-    path("categorias/", views.crear_categoria_objeto, name="listar_categoria_objeto"),
+    path("categoria/<int:categoria_id>/", views.detalle_categoria, name="detalle_categoria"),
     path("categoria/<int:categoria_id>/editar/", views.editar_categoria, name="editar_categoria"),
     path("categoria/<int:categoria_id>/borrar/", views.borrar_categoria, name="borrar_categoria"),
 
-
-    ## OBJETO
+    # OBJETO
+    path("objetos/", views.lista_objetos, name="lista_objetos"),
     path("objeto/crear/", views.crear_objeto, name="crear_objeto"),
-    path("objeto/crear/", views.crear_objeto, name="detalle_objeto"),
-    path("objetos/", views.crear_objeto, name="listar_objeto"),
+    path("objeto/<int:objeto_id>/", views.detalle_objeto, name="detalle_objeto"),
     path("objeto/<int:objeto_id>/editar/", views.editar_objeto, name="editar_objeto"),
     path("objeto/<int:objeto_id>/borrar/", views.borrar_objeto, name="borrar_objeto"),
 
-
-
-    ## TIPO DE OBJETO
+    # TIPO OBJETO
+    path("tipos-objeto/", views.lista_tipos_objeto, name="lista_tipos_objeto"),
     path("tipo-objeto/crear/", views.crear_tipo_objeto, name="crear_tipo_objeto"),
-    path("tipo-objeto/crear/", views.crear_tipo_objeto, name="detalle_tipo_objeto"),
-    path("tipo-objetos/", views.crear_tipo_objeto, name="listar_tipo_objeto"),
-    path("tipo-objeto/<int:tipo_objetos_id>/editar/", views.editar_tipo_objeto, name="editar_tipo_objeto"),
-    path("tipo-objeto/<int:tipo_objetos_id>/borrar/", views.borrar_tipo_objeto, name="borrar_tipo_objeto"),
+    path("tipo-objeto/<int:tipo_objeto_id>/", views.detalle_tipo_objeto, name="detalle_tipo_objeto"),
+    path("tipo-objeto/<int:tipo_objeto_id>/editar/", views.editar_tipo_objeto, name="editar_tipo_objeto"),
+    path("tipo-objeto/<int:tipo_objeto_id>/borrar/", views.borrar_tipo_objeto, name="borrar_tipo_objeto"),
 
-
-
-
-
-    ## HISTORICO
-    path("historicos/", views.borrar_lugar, name="listar_historico"),
+    # HISTORICO
+    path("historicos/", views.lista_historicos, name="lista_historicos"),
+    path("historico/", views.lista_historicos),  # alias para tu home actual
+    path("historico/<int:historico_id>/", views.detalle_historico, name="detalle_historico"),
     path("historico/<int:historico_id>/editar/", views.editar_historico, name="editar_historico"),
     path("historico/<int:historico_id>/borrar/", views.borrar_historico, name="borrar_historico"),
+    path("objetos-lugar/<int:objeto_lugar_id>/historico/crear/", views.crear_historico, name="crear_historico"),
 
 
-    
+    # urls.py
+    path("estructura/crear/", views.crear_estructura, name="crear_estructura"),
+
 ]

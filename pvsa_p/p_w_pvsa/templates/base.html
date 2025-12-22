@@ -4,16 +4,19 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PVSA</title>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
-          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+          crossorigin="anonymous">
   </head>
 
   <body>
 
     <nav class="navbar navbar-expand-lg navbar-dark shadow-sm" style="background-color:#3EC7C2;">
-      <div class="container">
+      <div class="container-fluid px-3">
 
-        <a class="navbar-brand fw-bold text-white text-uppercase" href="{% url 'home' %}">PVSA</a>
+        <!-- IZQUIERDA -->
+        <a class="navbar-brand fw-bold text-white" href="{% url 'home' %}">PVSA</a>
 
         {% if user.is_authenticated %}
           <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarPVSA"
@@ -22,18 +25,16 @@
           </button>
 
           <div class="collapse navbar-collapse" id="navbarPVSA">
-            <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
 
-              <li class="nav-item">
-                <a class="nav-link fw-semibold text-white text-uppercase" href="{% url 'home' %}">Home</a>
-              </li>
+            <!-- CENTRO -->
+            <ul class="navbar-nav mx-auto align-items-lg-center gap-lg-1">
 
               <!-- SECTOR -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white text-uppercase" href="#" role="button" data-bs-toggle="dropdown">
-                  Sector
+                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                  SECTOR
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end">
+                <ul class="dropdown-menu">
                   <li><a class="dropdown-item" href="{% url 'lista_sectores' %}">Ver</a></li>
                   <li><a class="dropdown-item" href="{% url 'crear_sector' %}">Crear</a></li>
                 </ul>
@@ -41,117 +42,127 @@
 
               <!-- UBICACION -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white text-uppercase" href="#" role="button" data-bs-toggle="dropdown">
-                  Ubicacion
+                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                  UBICACION
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end">
+                <ul class="dropdown-menu">
                   <li><a class="dropdown-item" href="{% url 'lista_ubicaciones' %}">Ver</a></li>
-                  <li><a class="dropdown-item" href="/ubicacion/crear/">Crear</a></li>
+                  <li><a class="dropdown-item" href="{% url 'crear_ubicacion' %}">Crear</a></li>
                 </ul>
               </li>
 
               <!-- PISO -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white text-uppercase" href="#" role="button" data-bs-toggle="dropdown">
-                  Piso
+                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                  PISO
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li><a class="dropdown-item" href="/pisos/">Ver</a></li>
-                  <li><a class="dropdown-item" href="/piso/crear/">Crear</a></li>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url 'lista_pisos' %}">Ver</a></li>
+                  <li><a class="dropdown-item" href="{% url 'crear_piso' %}">Crear</a></li>
                 </ul>
               </li>
 
               <!-- LUGAR -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white text-uppercase" href="#" role="button" data-bs-toggle="dropdown">
-                  Lugar
+                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                  LUGAR
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li><a class="dropdown-item" href="/lugares/">Ver</a></li>
-                  <li><a class="dropdown-item" href="/lugar/crear/">Crear</a></li>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url 'lista_lugares' %}">Ver</a></li>
+                  <li><a class="dropdown-item" href="{% url 'crear_lugar' %}">Crear</a></li>
                 </ul>
               </li>
 
-              <!-- TIPOLUGAR -->
+              <!-- TIPO DE LUGAR -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white text-uppercase" href="#" role="button" data-bs-toggle="dropdown">
-                  Tipo de lugar
+                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                  TIPO DE LUGAR
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li><a class="dropdown-item" href="/tipo-lugar/">Ver</a></li>
-                  <li><a class="dropdown-item" href="/tipo-lugar/crear/">Crear</a></li>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url 'lista_tipos_lugar' %}">Ver</a></li>
+                  <li><a class="dropdown-item" href="{% url 'crear_tipo_lugar' %}">Crear</a></li>
                 </ul>
               </li>
 
-              <!-- CATEGORIAOBJETO -->
+              <!-- CATEGORIA DEL OBJETO -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white text-uppercase" href="#" role="button" data-bs-toggle="dropdown">
-                  Categoria del objeto
+                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                  CATEGORIA DEL OBJETO
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li><a class="dropdown-item" href="/categorias/">Ver</a></li>
-                  <li><a class="dropdown-item" href="/categoria/crear/">Crear</a></li>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url 'lista_categorias' %}">Ver</a></li>
+                  <li><a class="dropdown-item" href="{% url 'crear_categoria_objeto' %}">Crear</a></li>
                 </ul>
               </li>
 
               <!-- OBJETO -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white text-uppercase" href="#" role="button" data-bs-toggle="dropdown">
-                  Objeto
+                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                  OBJETO
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li><a class="dropdown-item" href="/objetos/">Ver</a></li>
-                  <li><a class="dropdown-item" href="/objeto/crear/">Crear</a></li>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url 'lista_objetos' %}">Ver</a></li>
+                  <li><a class="dropdown-item" href="{% url 'crear_objeto' %}">Crear</a></li>
                 </ul>
               </li>
 
-              <!-- TIPOOBJETO -->
-              <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white text-uppercase" href="#" role="button" data-bs-toggle="dropdown">
-                  Tipo de objeto
-                </a>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li><a class="dropdown-item" href="/tipos-objeto/">Ver</a></li>
-                  <li><a class="dropdown-item" href="/tipo-objeto/crear/">Crear</a></li>
-                </ul>
-              </li>
-
-              <!-- OBJETOLUGAR -->
-              <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white text-uppercase" href="#" role="button" data-bs-toggle="dropdown">
-                  Objeto del lugar
-                </a>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li><a class="dropdown-item" href="/objetos-lugar/">Ver</a></li>
-                  <!-- normalmente se crea desde el detalle del lugar -->
-                  <li><a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">Crear (desde Lugar)</a></li>
-                </ul>
-              </li>
-
-              <!-- HISTORICOOBJETO -->
-              <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white text-uppercase" href="#" role="button" data-bs-toggle="dropdown">
-                  Historico
-                </a>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li><a class="dropdown-item" href="/historico/">Ver</a></li>
-                </ul>
-              </li>
-
-              <!-- USUARIO -->
+              <!-- TIPO DE OBJETO -->
               <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
-                  {{ user.username }}
+                  TIPO DE OBJETO
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li><a class="dropdown-item" href="{% url 'logout' %}">Cerrar sesión</a></li>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url 'lista_tipos_objeto' %}">Ver</a></li>
+                  <li><a class="dropdown-item" href="{% url 'crear_tipo_objeto' %}">Crear</a></li>
                 </ul>
               </li>
 
+              <!-- OBJETO DEL LUGAR -->
+              <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                  OBJETO DEL LUGAR
+                </a>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url 'lista_objetos_lugar' %}">Ver</a></li>
+                </ul>
+              </li>
+
+              <!-- HISTORICO -->
+              <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                  HISTORICO
+                </a>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url 'lista_historicos' %}">Ver</a></li>
+                </ul>
+              </li>
             </ul>
+
+            <ul class="navbar-nav ms-auto">
+              <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                {{ user.username }}
+                </a>
+
+                <ul class="dropdown-menu dropdown-menu-end">
+
+                  {% if user.is_staff or user.is_superuser %}
+                    <li>
+                      <a class="dropdown-item" href="/admin/">Panel Admin</a>
+                      <a class="dropdown-item" href="{% url 'signup' %}">Crear usuario</a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                  {% endif %}
+
+                  <li>
+                    <a class="dropdown-item" href="{% url 'signout' %}">Cerrar sesión</a>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+
           </div>
         {% endif %}
-
       </div>
     </nav>
 

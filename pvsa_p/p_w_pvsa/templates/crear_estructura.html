@@ -1,0 +1,117 @@
+{# templates/crear_estructura.html #}
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4" style="max-width: 1100px;">
+
+  <div class="mb-4">
+    <h2 class="mb-1">Carga completa</h2>
+    <p class="text-muted mb-0">
+      Crea sector, ubicación, piso y lugar, y agrega los objetos del lugar en una sola pantalla.
+    </p>
+  </div>
+
+  <form method="post" class="card shadow-sm border-0">
+    {% csrf_token %}
+    <div class="card-body p-4">
+
+      {% if base_form.non_field_errors %}
+        <div class="alert alert-danger">
+          {{ base_form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <h5 class="mb-3">Datos base</h5>
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          {{ base_form.sector.label_tag }}{{ base_form.sector }}
+        </div>
+        <div class="col-md-4">
+          {{ base_form.ubicacion.label_tag }}{{ base_form.ubicacion }}
+        </div>
+        <div class="col-md-4">
+          {{ base_form.piso.label_tag }}{{ base_form.piso }}
+        </div>
+        <div class="col-md-6">
+          {{ base_form.nombre_del_lugar.label_tag }}{{ base_form.nombre_del_lugar }}
+        </div>
+        <div class="col-md-3">
+          {{ base_form.tipo_lugar_existente.label_tag }}{{ base_form.tipo_lugar_existente }}
+          <div class="form-text">Selecciona uno ya creado (opcional).</div>
+        </div>
+        <div class="col-md-3">
+          {{ base_form.nuevo_tipo_lugar.label_tag }}{{ base_form.nuevo_tipo_lugar }}
+          <div class="form-text">Si escribes aquí se creará un nuevo tipo.</div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <h5 class="mb-3">Objetos del lugar</h5>
+      <p class="text-muted small mb-3">
+        Completa solo las filas que necesites. Puedes elegir un tipo de objeto existente
+        o crear nueva categoría / objeto / tipo de objeto.
+      </p>
+
+      {{ objetos_formset.management_form }}
+
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width: 220px;">Tipo de objeto (existente)</th>
+              <th style="width: 100px;">Cantidad</th>
+              <th style="width: 220px;">Estado</th>
+              <th style="width: 150px;">Detalle</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in objetos_formset %}
+              <tr>
+                <td>{{ f.tipo_de_objeto }}</td>
+                <td>{{ f.cantidad }}</td>
+                <td>{{ f.estado }}</td>
+                <td>{{ f.detalle }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <hr class="my-4">
+
+      <h5 class="mb-3">Crear detalles de objeto</h5>
+      <p class="text-muted small mb-3">
+        Completa para el formulario si necesitas crear un nuevo objeto no existente.
+      </p>
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width: 180px;">Nueva categoría</th>
+              <th style="min-width: 180px;">Nuevo objeto</th>
+              <th style="min-width: 140px;">Marca</th>
+              <th style="min-width: 140px;">Material</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in objetos_formset %}
+              <tr>
+                <td>{{ f.nueva_categoria }}</td>
+                <td>{{ f.nuevo_objeto }}</td>
+                <td>{{ f.marca }}</td>
+                <td>{{ f.material }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-primary" type="submit">Guardar todo</button>
+        <a class="btn btn-outline-secondary" href="{% url 'home' %}">Cancelar</a>
+      </div>
+
+    </div>
+  </form>
+
+</div>
+{% endblock %}
