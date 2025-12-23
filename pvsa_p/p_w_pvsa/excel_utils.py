@@ -2,6 +2,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from copy import copy
+from .models import ObjetoLugar
 
 THIN = Side(style="thin", color="000000")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
@@ -78,7 +79,7 @@ def _write_lugar_block(ws, start_row, lugar, objetos_qs):
     for ol in objetos_qs:
         count += 1
         objeto_nombre = ol.tipo_de_objeto.objeto.nombre_del_objeto
-        tipo_txt = f"{ol.tipo_de_objeto.marca}{ol.tipo_de_objeto.material}".strip()
+        tipo_txt = f"{ol.tipo_de_objeto.marca} {ol.tipo_de_objeto.material}"
 
         ws.cell (r,1,objeto_nombre).font = FONT_CELL
         ws.cell (r,2,tipo_txt).font = FONT_CELL
@@ -131,7 +132,7 @@ def build_excel_sectores(ubicaciones_qs):
 
             lugares = p.lugar_set.all().order_by("id")
             for lugar in lugares:
-                objetos = lugar.objetolugar_set.select_related("tipo_de_objeto__objeto").order_by("id")
+                objetos = (ObjetoLugar.objects.filter(lugar=lugar).select_related("tipo_de_objeto__objeto").order_by("id"))
                 row = _write_lugar_block(ws, row, lugar, objetos)
             row += 1
     bio = BytesIO()

@@ -45,8 +45,8 @@ class ObjetoInline(nested_admin.NestedStackedInline):
 
 class CategoriaObjetoAdmin(nested_admin.NestedModelAdmin):
     inlines = [ObjetoInline]
-    list_display= ("nombre_de_la_categoria",)
-    search_fields=("nombre_de_la_categoria",)
+    list_display= ("nombre_de_categoria",)
+    search_fields=("nombre_de_categoria",)
 
 
 admin.site.register(Sector, SectorAdmin)

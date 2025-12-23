@@ -13,8 +13,10 @@
     </div>
 
     <div class="d-flex gap-2">
-      <a class="btn btn-outline-primary" href="{% url 'editar_ubicacion' ubicacion.id %}">Editar</a>
-      <a class="btn btn-outline-danger" href="{% url 'borrar_ubicacion' ubicacion.id %}">Borrar</a>
+        <a href="{% url 'crear_piso' %}" class="btn btn-primary btn-sm">+ Agregar Piso</a>
+        <a class="btn btn-outline-primary" href="{% url 'editar_ubicacion' ubicacion.id %}">Editar</a>
+        <a class="btn btn-outline-danger" href="{% url 'borrar_ubicacion' ubicacion.id %}">Borrar</a>
+
     </div>
   </div>
 

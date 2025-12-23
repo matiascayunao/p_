@@ -49,11 +49,11 @@
               {% for o in objetos %}
               <tr>
                 <td>{{ o.cantidad }}</td>
-                <td>{{ o.tipo_de_objeto.objeto }}</td>
+                <td>{{ o.tipo_de_objeto.objeto.nombre_del_objeto }}</td>
                 <td>{{ o.tipo_de_objeto }}</td>
                 <td>
                   {% if o.estado == "B" %}
-                    <span class="badge text-bg-success">Bueno</span>
+                    <span class="badge text-bg-success">Bueno</span>|
                   {% elif o.estado == "P" %}
                     <span class="badge text-bg-warning">Pendiente</span>
                   {% elif o.estado == "M" %}

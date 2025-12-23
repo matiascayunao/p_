@@ -10,18 +10,18 @@
         {% csrf_token %}
 
         <div class="mb-3">
-          <label class="form-label" for="{{ form.nombre_de_la_categoria.id_for_label }}">Nombre de categoría</label>
+          <label class="form-label" for="{{ form.nombre_de_categoria.id_for_label }}">Nombre de categoría</label>
           <input
             type="text"
-            name="{{ form.nombre_de_la_categoria.name }}"
-            id="{{ form.nombre_de_la_categoria.id_for_label }}"
-            value="{{ form.nombre_de_la_categoria.value|default_if_none:'' }}"
-            class="form-control {% if form.nombre_de_la_categoria.errors %}is-invalid{% endif %}"
+            name="{{ form.nombre_de_categoria.name }}"
+            id="{{ form.nombre_de_categoria.id_for_label }}"
+            value="{{ form.nombre_de_categoria.value|default_if_none:'' }}"
+            class="form-control {% if form.nombre_de_categoria.errors %}is-invalid{% endif %}"
             placeholder="Ej: Eléctrico"
             required
           >
           {% if form.nombre_de_la_categoria.errors %}
-            <div class="invalid-feedback">{{ form.nombre_de_la_categoria.errors|striptags }}</div>
+            <div class="invalid-feedback">{{ form.nombre_de_categoria.errors|striptags }}</div>
           {% endif %}
         </div>
 

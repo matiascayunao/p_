@@ -26,13 +26,14 @@ from .models import (
 
 # -------------------
 # AUTH
-# -------------------
+# -------------------   
 
+@login_required
 def descargar_excel_sectores(request):
-    ubicaciones = (Ubicacion.objects.select_related("sector").prefetch_related("piso_set__lugar_set__objetolugar_set__tipo_de_objeto__objeto").order_by("sector__sector", "ubicacion"))
+    ubicaciones = (Ubicacion.objects.select_related("sector").order_by("sector__sector","ubicacion"))
     xlsx_bytes = build_excel_sectores(ubicaciones)
 
-    response = HttpResponse(xlsx_bytes, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response = HttpResponse(xlsx_bytes, content_type="application/vnd.openxmlformats-officedocument.""spreadsheetml.sheet")
     response["Content-Disposition"]= 'attachment; filename= "SECTORES.xlsx"'
     return response
 
@@ -517,9 +518,8 @@ def borrar_lugar(request, lugar_id):
 @login_required
 def lista_objetos_lugar(request):
     objetos = (
-        ObjetoLugar.objects.select_related(
-            "lugar", "tipo_de_objeto", "tipo_de_objeto__objeto"
-        )
+        ObjetoLugar.objects
+        .select_related("lugar", "tipo_de_objeto", "tipo_de_objeto__objeto")
         .all()
         .order_by("-fecha")
     )
@@ -529,8 +529,10 @@ def lista_objetos_lugar(request):
 @login_required
 def detalle_objeto_lugar(request, objeto_lugar_id):
     obj = get_object_or_404(ObjetoLugar, pk=objeto_lugar_id)
-    historicos = HistoricoObjeto.objects.filter(objeto_del_lugar=obj).order_by(
-        "-fecha_anterior"
+    historicos = (
+        HistoricoObjeto.objects
+        .filter(objeto_del_lugar=obj)
+        .order_by("-fecha_anterior")
     )
     return render(
         request,
@@ -542,6 +544,7 @@ def detalle_objeto_lugar(request, objeto_lugar_id):
 @login_required
 def crear_objeto_lugar(request, lugar_id):
     lugar = get_object_or_404(Lugar, pk=lugar_id)
+
     if request.method == "GET":
         return render(
             request,
@@ -567,7 +570,8 @@ def crear_objeto_lugar(request, lugar_id):
 def editar_objeto_lugar(request, objeto_lugar_id):
     objeto_lugar = get_object_or_404(ObjetoLugar, pk=objeto_lugar_id)
     cancel_url = reverse(
-        "detalle_objeto_lugar", kwargs={"objeto_lugar_id": objeto_lugar.id}
+        "detalle_objeto_lugar",
+        kwargs={"objeto_lugar_id": objeto_lugar.id},
     )
 
     if request.method == "GET":
@@ -580,14 +584,6 @@ def editar_objeto_lugar(request, objeto_lugar_id):
                 "cancel_url": cancel_url,
             },
         )
-
-    HistoricoObjeto.objects.create(
-        objeto_del_lugar=objeto_lugar,
-        cantidad_anterior=objeto_lugar.cantidad,
-        estado_anterior=objeto_lugar.estado,
-        detalle_anterior=objeto_lugar.detalle or "",
-        fecha_anterior=objeto_lugar.fecha,
-    )
 
     form = EditarObjetoLugar(request.POST, instance=objeto_lugar)
     if form.is_valid():
@@ -611,11 +607,10 @@ def borrar_objeto_lugar(request, objeto_lugar_id):
     return _confirm_delete(
         request,
         obj,
-        "detalle_objeto_lugar",
-        {"objeto_lugar_id": obj.id},
+        "detalle_lugar",
+        {"lugar_id": obj.lugar_id},
         "lista_objetos_lugar",
     )
-
 
 # -------------------
 # TIPO LUGAR
@@ -699,14 +694,14 @@ def borrar_tipo_lugar(request, tipo_lugar_id):
 
 @login_required
 def lista_categorias(request):
-    categorias = CategoriaObjeto.objects.all().order_by("nombre_de_la_categoria")
+    categorias = CategoriaObjeto.objects.all().order_by("nombre_de_categoria")
     return render(request, "categorias.html", {"categorias": categorias})
 
 
 @login_required
 def detalle_categoria(request, categoria_id):
     categoria = get_object_or_404(CategoriaObjeto, pk=categoria_id)
-    objetos = Objeto.objects.filter(categoria=categoria).order_by("nombre_del_objeto")
+    objetos = Objeto.objects.filter(objeto_categoria_id=categoria_id).order_by("nombre_del_objeto")
     return render(
         request,
         "detalle_categoria.html",
@@ -775,7 +770,7 @@ def borrar_categoria(request, categoria_id):
 
 @login_required
 def lista_objetos(request):
-    objetos = Objeto.objects.select_related("categoria").all().order_by(
+    objetos = Objeto.objects.select_related("objeto_categoria").all().order_by(
         "nombre_del_objeto"
     )
     return render(request, "objetos.html", {"objetos": objetos})
@@ -850,7 +845,7 @@ def borrar_objeto(request, objeto_id):
 @login_required
 def lista_tipos_objeto(request):
     tipos = (
-        TipoObjeto.objects.select_related("objeto", "objeto__categoria")
+        TipoObjeto.objects.select_related("objeto", "objeto__objeto_categoria")
         .all()
         .order_by("objeto__nombre_del_objeto", "marca")
     )

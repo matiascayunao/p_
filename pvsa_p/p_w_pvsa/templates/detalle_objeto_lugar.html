@@ -12,16 +12,12 @@
     <div class="card-body">
       <h2 class="mb-1">{{ objeto_lugar.lugar }}</h2>
       <div class="text-muted">
-        {{ objeto_lugar.tipo_de_objeto.objeto }} | {{ objeto_lugar.tipo_de_objeto }} |
+        {{ objeto_lugar.tipo_de_objeto.objeto }} |
         Cantidad: {{ objeto_lugar.cantidad }} | Estado: {{ objeto_lugar.get_estado_display }} | Fecha: {{ objeto_lugar.fecha }}
       </div>
     </div>
   </div>
 
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <h4 class="mb-0">Histórico</h4>
-    <a class="btn btn-primary btn-sm" href="{% url 'crear_historico' objeto_lugar_id=objeto_lugar.id %}">+ Crear histórico</a>
-  </div>
 
   <div class="card shadow-sm border-0">
     <div class="card-body p-0">

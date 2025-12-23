@@ -1,14 +1,22 @@
 from django.forms import ModelForm, formset_factory
 from django import forms
 from .models import (
-    Sector, Ubicacion, Piso, Lugar, TipoLugar,
-    TipoObjeto, CategoriaObjeto, ObjetoLugar, Objeto,
+    Sector,
+    Ubicacion,
+    Piso,
+    Lugar,
+    TipoLugar,
+    TipoObjeto,
+    CategoriaObjeto,
+    ObjetoLugar,
+    Objeto,
     HistoricoObjeto,
 )
 
 # -------------------
 # CREAR
 # -------------------
+
 
 class CrearSector(ModelForm):
     class Meta:
@@ -34,10 +42,17 @@ class CrearLugar(ModelForm):
         fields = ["nombre_del_lugar", "piso", "lugar_tipo_lugar"]
 
 
-class CrearObjetoLugar(ModelForm):
+class CrearObjetoLugar(forms.ModelForm):
     class Meta:
         model = ObjetoLugar
         fields = ["tipo_de_objeto", "cantidad", "estado", "detalle"]
+        widgets = {
+            "cantidad": forms.NumberInput(attrs={"class": "form-control"}),
+            "estado": forms.Select(attrs={"class": "form-select"}),
+            "detalle": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Detalle (opcional)"}
+            ),
+        }
 
 
 class CrearTipoLugar(ModelForm):
@@ -49,13 +64,13 @@ class CrearTipoLugar(ModelForm):
 class CrearCategoriaObjeto(ModelForm):
     class Meta:
         model = CategoriaObjeto
-        fields = ["nombre_de_la_categoria"]
+        fields = ["nombre_de_categoria"]
 
 
 class CrearObjeto(ModelForm):
     class Meta:
         model = Objeto
-        fields = ["nombre_del_objeto", "categoria"]
+        fields = ["nombre_del_objeto", "objeto_categoria"]
 
 
 class CrearTipoObjeto(ModelForm):
@@ -98,6 +113,7 @@ class CrearHistorico(forms.ModelForm):
 # EDITAR
 # -------------------
 
+
 class EditarSector(ModelForm):
     class Meta:
         model = Sector
@@ -131,13 +147,13 @@ class EditarLugar(ModelForm):
 class EditarCategoria(ModelForm):
     class Meta:
         model = CategoriaObjeto
-        fields = ["nombre_de_la_categoria"]
+        fields = ["nombre_de_categoria"]
 
 
 class EditarObjeto(ModelForm):
     class Meta:
         model = Objeto
-        fields = ["nombre_del_objeto", "categoria"]
+        fields = ["nombre_del_objeto", "objeto_categoria"]
 
 
 class EditarTipoObjeto(ModelForm):
@@ -146,10 +162,18 @@ class EditarTipoObjeto(ModelForm):
         fields = ["objeto", "marca", "material"]
 
 
-class EditarObjetoLugar(ModelForm):
+class EditarObjetoLugar(forms.ModelForm):
     class Meta:
         model = ObjetoLugar
         fields = ["tipo_de_objeto", "cantidad", "estado", "detalle"]
+        widgets = {
+            "tipo_de_objeto": forms.Select(attrs={"class": "form-select"}),
+            "cantidad": forms.NumberInput(attrs={"class": "form-control"}),
+            "estado": forms.Select(attrs={"class": "form-select"}),
+            "detalle": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Detalle (opcional)"}
+            ),
+        }
 
 
 class EditarHistorico(ModelForm):
@@ -165,8 +189,9 @@ class EditarHistorico(ModelForm):
 
 
 # -------------------
-# FORMULARIO UNICO DE ESTRUCTURA
+# FORMULARIO ÚNICO DE ESTRUCTURA
 # -------------------
+
 
 class BaseEstructuraForm(forms.Form):
     sector = forms.CharField(max_length=100, label="Sector")
@@ -211,53 +236,40 @@ class BaseEstructuraForm(forms.Form):
 
 
 class ObjetoLugarFilaForm(forms.Form):
-    # EXISTENTE
     tipo_de_objeto = forms.ModelChoiceField(
-        label="Tipo de objeto (existente)",
-        queryset=TipoObjeto.objects.select_related("objeto", "objeto__categoria"),
-        required=False,
-        widget=forms.Select(attrs={"class": "form-select"}),
+        label="Tipo de objeto",
+        queryset=TipoObjeto.objects.select_related("objeto")
+        .all()
+        .order_by("objeto__nombre_del_objeto", "marca", "material"),
+        widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
     )
 
-    # DATOS DEL OBJETO EN EL LUGAR
     cantidad = forms.IntegerField(
-        label="Cantidad",
-        required=False,
-        min_value=1,
-        widget=forms.NumberInput(attrs={"class": "form-control"}),
+        label="Cant.",
+        min_value=0,
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control form-control-sm",
+                "style": "width: 80px;",
+            }
+        ),
     )
+
     estado = forms.ChoiceField(
         label="Estado",
-        required=False,
-        choices=ObjetoLugar.ESTADO.items(),
-        widget=forms.Select(attrs={"class": "form-select"}),
+        choices=ObjetoLugar.ESTADO,  # <-- SIN .items()
+        widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
     )
+
     detalle = forms.CharField(
         label="Detalle",
         required=False,
-        widget=forms.TextInput(attrs={"class": "form-control"}),
-    )
-
-    # PARA CREAR NUEVOS
-    nueva_categoria = forms.CharField(
-        label="Nueva categoría",
-        required=False,
-        widget=forms.TextInput(attrs={"class": "form-control"}),
-    )
-    nuevo_objeto = forms.CharField(
-        label="Nuevo objeto",
-        required=False,
-        widget=forms.TextInput(attrs={"class": "form-control"}),
-    )
-    marca = forms.CharField(
-        label="Marca",
-        required=False,
-        widget=forms.TextInput(attrs={"class": "form-control"}),
-    )
-    material = forms.CharField(
-        label="Material",
-        required=False,
-        widget=forms.TextInput(attrs={"class": "form-control"}),
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control form-control-sm",
+                "placeholder": "Detalle (opcional)",
+            }
+        ),
     )
 
 

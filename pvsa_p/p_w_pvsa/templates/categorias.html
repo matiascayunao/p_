@@ -16,7 +16,7 @@
           {% for c in categorias %}
             <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
                href="{% url 'detalle_categoria' categoria_id=c.id %}">
-              <span>{{ c.nombre_de_la_categoria }}</span>
+              <span>{{ c.nombre_de_categoria }}</span>
               <span class="text-muted">Ver &raquo;</span>
             </a>
           {% endfor %}
