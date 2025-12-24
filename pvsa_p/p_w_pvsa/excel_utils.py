@@ -18,6 +18,10 @@ FONT_CELL = Font(size=10)
 CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
 LEFT = Alignment(horizontal="left", vertical="top", wrap_text=True)
 
+FILL_ESTADO_BUENO = PatternFill("solid", fgColor="C6EFCE")
+FILL_ESTADO_PENDIENTE = PatternFill("solid", fgColor="FFF2CC")
+FILL_ESTADO_MALO = PatternFill("solid", fgColor="F9CBAD")
+
 def _safe_sheet_name(name: str ) -> str:
     bad = [":","\\","/","?", "*","[","]"]
     for ch in bad:
@@ -79,12 +83,27 @@ def _write_lugar_block(ws, start_row, lugar, objetos_qs):
     for ol in objetos_qs:
         count += 1
         objeto_nombre = ol.tipo_de_objeto.objeto.nombre_del_objeto
-        tipo_txt = f"{ol.tipo_de_objeto.marca} {ol.tipo_de_objeto.material}"
+        ### tipo_txt = f"{ol.tipo_de_objeto.marca}  -  {ol.tipo_de_objeto.material}"
+        marca = (ol.tipo_de_objeto.marca or "").strip()
+        material = (ol.tipo_de_objeto.material or "").strip()
+        partes = [p for p in (marca, material)if p] 
+        tipo_txt= " - ".join(partes) if partes else "-"
 
         ws.cell (r,1,objeto_nombre).font = FONT_CELL
         ws.cell (r,2,tipo_txt).font = FONT_CELL
         ws.cell(r,3,ol.cantidad).font = FONT_CELL
-        ws.cell(r,4,ol.get_estado_display()).font = FONT_CELL
+
+        estado = ol.get_estado_display()
+        estado_cell = ws.cell(r,4, estado)
+        estado_cell.font = FONT_CELL
+        
+        if estado == "Bueno":
+            estado_cell.fill = FILL_ESTADO_BUENO
+        elif estado == "Pendiente":
+            estado_cell.fill = FILL_ESTADO_PENDIENTE
+        elif estado == "Malo":
+            estado_cell.fill = FILL_ESTADO_MALO
+
         ws.cell (r,5,ol.detalle or "-").font = FONT_CELL
         cfecha = ws.cell(r,6,ol.fecha)
         cfecha.number_format = "dd/mm/yyyy"

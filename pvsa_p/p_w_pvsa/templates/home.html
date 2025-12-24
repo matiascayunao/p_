@@ -41,6 +41,19 @@
     <div class="col-12 col-md-6 col-lg-4">
       <div class="card h-100 shadow-sm border-0">
         <div class="card-body">
+          <h5 class="card-title mb-2 ">Resumen</h5>
+          <div class="d-grid gap-2 pt-2">
+            <a href="{% url 'resumen_general' %}" class="btn btn-success">
+              resumen
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm border-0">
+        <div class="card-body">
           <h5 class="card-title mb-2 text-uppercase">Sector</h5>
           <div class="d-grid gap-2">
             <a href="{% url 'lista_sectores' %}" class="btn btn-outline-primary">Ver</a>

@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.db import transaction
 from django.http import HttpResponse
 from .excel_utils import build_excel_sectores
+from django.db.models import Sum, Q
 
 from .forms import (
     CrearSector, CrearUbicacion, CrearPiso, CrearLugar,
@@ -234,7 +235,7 @@ def _confirm_delete(request, obj, cancel_url_name, cancel_kwargs, success_url_na
 @login_required
 def lista_sectores(request):
     sectores = Sector.objects.all().order_by("sector")
-    return render(request, "sectores.html", {"sectores": sectores})
+    return render(request, "sector/sectores.html", {"sectores": sectores})
 
 
 @login_required
@@ -243,7 +244,7 @@ def detalle_sector(request, sector_id):
     ubicaciones = Ubicacion.objects.filter(sector=sector).order_by("ubicacion")
     return render(
         request,
-        "detalle_sector.html",
+        "sector/detalle_sector.html",
         {"sector": sector, "ubicaciones": ubicaciones},
     )
 
@@ -251,12 +252,12 @@ def detalle_sector(request, sector_id):
 @login_required
 def crear_sector(request):
     if request.method == "GET":
-        return render(request, "crear_sector.html", {"form": CrearSector()})
+        return render(request, "sector/crear_sector.html", {"form": CrearSector()})
     form = CrearSector(request.POST)
     if form.is_valid():
         form.save()
         return redirect("lista_sectores")
-    return render(request, "crear_sector.html", {"form": form})
+    return render(request, "sector/crear_sector.html", {"form": form})
 
 
 @login_required
@@ -265,7 +266,7 @@ def editar_sector(request, sector_id):
     if request.method == "GET":
         return render(
             request,
-            "editar_sector.html",
+            "sector/editar_sector.html",
             {"form": EditarSector(instance=sector), "sector": sector},
         )
 
@@ -275,7 +276,7 @@ def editar_sector(request, sector_id):
         return redirect("detalle_sector", sector_id=sector.id)
     return render(
         request,
-        "editar_sector.html",
+        "sector/editar_sector.html",
         {"form": form, "sector": sector},
     )
 
@@ -295,7 +296,7 @@ def borrar_sector(request, sector_id):
 @login_required
 def lista_ubicaciones(request):
     ubicaciones = Ubicacion.objects.select_related("sector").all().order_by("ubicacion")
-    return render(request, "ubicaciones.html", {"ubicaciones": ubicaciones})
+    return render(request, "ubicacion/ubicaciones.html", {"ubicaciones": ubicaciones})
 
 
 @login_required
@@ -304,7 +305,7 @@ def detalle_ubicacion(request, ubicacion_id):
     pisos = Piso.objects.filter(ubicacion=ubicacion).order_by("piso")
     return render(
         request,
-        "detalle_ubicacion.html",
+        "ubicacion/detalle_ubicacion.html",
         {"ubicacion": ubicacion, "pisos": pisos},
     )
 
@@ -312,12 +313,12 @@ def detalle_ubicacion(request, ubicacion_id):
 @login_required
 def crear_ubicacion(request):
     if request.method == "GET":
-        return render(request, "crear_ubicacion.html", {"form": CrearUbicacion()})
+        return render(request, "ubicacion/crear_ubicacion.html", {"form": CrearUbicacion()})
     form = CrearUbicacion(request.POST)
     if form.is_valid():
         ubicacion = form.save()
         return redirect("detalle_sector", sector_id=ubicacion.sector_id)
-    return render(request, "crear_ubicacion.html", {"form": form})
+    return render(request, "ubicacion/crear_ubicacion.html", {"form": form})
 
 
 @login_required
@@ -326,7 +327,7 @@ def editar_ubicacion(request, ubicacion_id):
     if request.method == "GET":
         return render(
             request,
-            "editar_ubicacion.html",
+            "ubicacion/editar_ubicacion.html",
             {"form": EditarUbicacion(instance=ubicacion), "ubicacion": ubicacion},
         )
 
@@ -336,7 +337,7 @@ def editar_ubicacion(request, ubicacion_id):
         return redirect("detalle_ubicacion", ubicacion_id=ubicacion.id)
     return render(
         request,
-        "editar_ubicacion.html",
+        "ubicacion/editar_ubicacion.html",
         {"form": form, "ubicacion": ubicacion},
     )
 
@@ -364,7 +365,7 @@ def lista_pisos(request):
         .all()
         .order_by("ubicacion__ubicacion", "piso")
     )
-    return render(request, "pisos.html", {"pisos": pisos})
+    return render(request, "piso/pisos.html", {"pisos": pisos})
 
 
 @login_required
@@ -373,7 +374,7 @@ def detalle_piso(request, piso_id):
     lugares = Lugar.objects.filter(piso=piso).order_by("nombre_del_lugar")
     return render(
         request,
-        "detalle_piso.html",
+        "piso/detalle_piso.html",
         {"piso": piso, "lugares": lugares},
     )
 
@@ -381,12 +382,12 @@ def detalle_piso(request, piso_id):
 @login_required
 def crear_piso(request):
     if request.method == "GET":
-        return render(request, "crear_piso.html", {"form": CrearPiso()})
+        return render(request, "piso/crear_piso.html", {"form": CrearPiso()})
     form = CrearPiso(request.POST)
     if form.is_valid():
         piso = form.save()
         return redirect("detalle_ubicacion", ubicacion_id=piso.ubicacion_id)
-    return render(request, "crear_piso.html", {"form": form})
+    return render(request, "piso/crear_piso.html", {"form": form})
 
 
 @login_required
@@ -442,7 +443,7 @@ def lista_lugares(request):
         .all()
         .order_by("nombre_del_lugar")
     )
-    return render(request, "lugares.html", {"lugares": lugares})
+    return render(request, "lugar/lugares.html", {"lugares": lugares})
 
 
 @login_required
@@ -455,7 +456,7 @@ def detalle_lugar(request, lugar_id):
     )
     return render(
         request,
-        "detalle_lugar.html",
+        "lugar/detalle_lugar.html",
         {"lugar": lugar, "objetos": objetos},
     )
 
@@ -463,12 +464,12 @@ def detalle_lugar(request, lugar_id):
 @login_required
 def crear_lugar(request):
     if request.method == "GET":
-        return render(request, "crear_lugar.html", {"form": CrearLugar()})
+        return render(request, "lugar/crear_lugar.html", {"form": CrearLugar()})
     form = CrearLugar(request.POST)
     if form.is_valid():
         lugar = form.save()
         return redirect("detalle_piso", piso_id=lugar.piso_id)
-    return render(request, "crear_lugar.html", {"form": form})
+    return render(request, "lugar/crear_lugar.html", {"form": form})
 
 
 @login_required
@@ -523,7 +524,7 @@ def lista_objetos_lugar(request):
         .all()
         .order_by("-fecha")
     )
-    return render(request, "objetos_lugar.html", {"objetos": objetos})
+    return render(request, "objeto_lugar/objetos_lugar.html", {"objetos": objetos})
 
 
 @login_required
@@ -536,7 +537,7 @@ def detalle_objeto_lugar(request, objeto_lugar_id):
     )
     return render(
         request,
-        "detalle_objeto_lugar.html",
+        "objeto_lugar/detalle_objeto_lugar.html",
         {"objeto_lugar": obj, "historicos": historicos},
     )
 
@@ -548,7 +549,7 @@ def crear_objeto_lugar(request, lugar_id):
     if request.method == "GET":
         return render(
             request,
-            "crear_objeto_lugar.html",
+            "objeto_lugar/crear_objeto_lugar.html",
             {"form": CrearObjetoLugar(), "lugar": lugar},
         )
 
@@ -561,7 +562,7 @@ def crear_objeto_lugar(request, lugar_id):
 
     return render(
         request,
-        "crear_objeto_lugar.html",
+        "objeto_lugar/crear_objeto_lugar.html",
         {"form": form, "lugar": lugar},
     )
 
@@ -619,7 +620,7 @@ def borrar_objeto_lugar(request, objeto_lugar_id):
 @login_required
 def lista_tipos_lugar(request):
     tipos = TipoLugar.objects.all().order_by("tipo_de_lugar")
-    return render(request, "tipos_lugar.html", {"tipos": tipos})
+    return render(request, "tipo_lugar/tipos_lugar.html", {"tipos": tipos})
 
 
 @login_required
@@ -628,7 +629,7 @@ def detalle_tipo_lugar(request, tipo_lugar_id):
     lugares = Lugar.objects.filter(lugar_tipo_lugar=tipo).order_by("nombre_del_lugar")
     return render(
         request,
-        "detalle_tipo_lugar.html",
+        "tipo_lugar/detalle_tipo_lugar.html",
         {"tipo": tipo, "lugares": lugares},
     )
 
@@ -636,12 +637,12 @@ def detalle_tipo_lugar(request, tipo_lugar_id):
 @login_required
 def crear_tipo_lugar(request):
     if request.method == "GET":
-        return render(request, "crear_tipo_lugar.html", {"form": CrearTipoLugar()})
+        return render(request, "tipo_lugar/crear_tipo_lugar.html", {"form": CrearTipoLugar()})
     form = CrearTipoLugar(request.POST)
     if form.is_valid():
         form.save()
         return redirect("lista_tipos_lugar")
-    return render(request, "crear_tipo_lugar.html", {"form": form})
+    return render(request, "tipo_lugar/crear_tipo_lugar.html", {"form": form})
 
 
 @login_required
@@ -695,7 +696,7 @@ def borrar_tipo_lugar(request, tipo_lugar_id):
 @login_required
 def lista_categorias(request):
     categorias = CategoriaObjeto.objects.all().order_by("nombre_de_categoria")
-    return render(request, "categorias.html", {"categorias": categorias})
+    return render(request, "categoria/categorias.html", {"categorias": categorias})
 
 
 @login_required
@@ -704,7 +705,7 @@ def detalle_categoria(request, categoria_id):
     objetos = Objeto.objects.filter(objeto_categoria_id=categoria_id).order_by("nombre_del_objeto")
     return render(
         request,
-        "detalle_categoria.html",
+        "categoria/detalle_categoria.html",
         {"categoria": categoria, "objetos": objetos},
     )
 
@@ -714,14 +715,14 @@ def crear_categoria_objeto(request):
     if request.method == "GET":
         return render(
             request,
-            "crear_categoria_objeto.html",
+            "categoria/crear_categoria_objeto.html",
             {"form": CrearCategoriaObjeto()},
         )
     form = CrearCategoriaObjeto(request.POST)
     if form.is_valid():
         form.save()
         return redirect("lista_categorias")
-    return render(request, "crear_categoria_objeto.html", {"form": form})
+    return render(request, "categoria/crear_categoria_objeto.html", {"form": form})
 
 
 @login_required
@@ -773,7 +774,7 @@ def lista_objetos(request):
     objetos = Objeto.objects.select_related("objeto_categoria").all().order_by(
         "nombre_del_objeto"
     )
-    return render(request, "objetos.html", {"objetos": objetos})
+    return render(request, "objeto/objetos.html", {"objetos": objetos})
 
 
 @login_required
@@ -782,7 +783,7 @@ def detalle_objeto(request, objeto_id):
     tipos = TipoObjeto.objects.filter(objeto=objeto).order_by("marca", "material")
     return render(
         request,
-        "detalle_objeto.html",
+        "objeto/detalle_objeto.html",
         {"objeto": objeto, "tipos": tipos},
     )
 
@@ -790,12 +791,12 @@ def detalle_objeto(request, objeto_id):
 @login_required
 def crear_objeto(request):
     if request.method == "GET":
-        return render(request, "crear_objeto.html", {"form": CrearObjeto()})
+        return render(request, "objeto/crear_objeto.html", {"form": CrearObjeto()})
     form = CrearObjeto(request.POST)
     if form.is_valid():
         form.save()
         return redirect("lista_objetos")
-    return render(request, "crear_objeto.html", {"form": form})
+    return render(request, "objeto/crear_objeto.html", {"form": form})
 
 
 @login_required
@@ -849,7 +850,7 @@ def lista_tipos_objeto(request):
         .all()
         .order_by("objeto__nombre_del_objeto", "marca")
     )
-    return render(request, "tipos_objeto.html", {"tipos": tipos})
+    return render(request, "tipo_objeto/tipos_objeto.html", {"tipos": tipos})
 
 
 @login_required
@@ -862,7 +863,7 @@ def detalle_tipo_objeto(request, tipo_objeto_id):
     )
     return render(
         request,
-        "detalle_tipo_objeto.html",
+        "tipo_objeto/detalle_tipo_objeto.html",
         {"tipo": tipo, "usados": usados},
     )
 
@@ -870,12 +871,12 @@ def detalle_tipo_objeto(request, tipo_objeto_id):
 @login_required
 def crear_tipo_objeto(request):
     if request.method == "GET":
-        return render(request, "crear_tipo_objeto.html", {"form": CrearTipoObjeto()})
+        return render(request, "tipo_objeto/crear_tipo_objeto.html", {"form": CrearTipoObjeto()})
     form = CrearTipoObjeto(request.POST)
     if form.is_valid():
         form.save()
         return redirect("lista_tipos_objeto")
-    return render(request, "crear_tipo_objeto.html", {"form": form})
+    return render(request, "tipo_objeto/crear_tipo_objeto.html", {"form": form})
 
 
 @login_required
@@ -938,13 +939,13 @@ def lista_historicos(request):
         .all()
         .order_by("-fecha_anterior")
     )
-    return render(request, "historicos.html", {"historicos": historicos})
+    return render(request, "historico/historicos.html", {"historicos": historicos})
 
 
 @login_required
 def detalle_historico(request, historico_id):
     historico = get_object_or_404(HistoricoObjeto, pk=historico_id)
-    return render(request, "detalle_historico.html", {"historico": historico})
+    return render(request, "historico/detalle_historico.html", {"historico": historico})
 
 
 @login_required
@@ -963,7 +964,7 @@ def crear_historico(request, objeto_lugar_id):
         )
         return render(
             request,
-            "crear_historico.html",
+            "historico/crear_historico.html",
             {"form": form, "objeto_lugar": objeto_lugar},
         )
 
@@ -976,7 +977,7 @@ def crear_historico(request, objeto_lugar_id):
 
     return render(
         request,
-        "crear_historico.html",
+        "historico/crear_historico.html",
         {"form": form, "objeto_lugar": objeto_lugar},
     )
 
@@ -1023,3 +1024,75 @@ def borrar_historico(request, historico_id):
         {"historico_id": historico.id},
         "lista_historicos",
     )
+
+
+# -------------------
+# RESUMEN
+# -------------------
+
+def _add_percentages(rows):
+    for r in rows:
+        total = r.get("total") or 0
+        b = r.get("buenas") or 0
+        p = r.get("pendientes") or 0
+        m = r.get("malas") or 0
+
+        if total ==0:
+            r["pct_buenas"] = r["pct_pendientes"] = r["pct_malas"] = 0
+        else:
+            r["pct_buenas"] = round(b * 100 / total, 1)
+            r["pct_pendientes"] = round(p * 100 / total, 1)
+            r["pct_malas"] = round(m * 100 / total, 1)
+    return rows
+
+def resumen_general(request):
+
+    qs_sector = (ObjetoLugar.objects.values("lugar__piso__ubicacion__sector__id","lugar__piso__ubicacion__sector__sector")
+                 .annotate(total=Sum("cantidad"),buenas=Sum("cantidad",filter=Q(estado="B")), pendientes=Sum("cantidad", filter=Q(estado = "P")),
+                           malas=Sum("cantidad", filter=Q(estado = "M")),).order_by("lugar__piso__ubicacion__sector__sector"))
+    resumen_sector = list(qs_sector)
+    _add_percentages(resumen_sector)
+
+    qs_ubic = (ObjetoLugar.objects.values("lugar__piso__ubicacion__id","lugar__piso__ubicacion__ubicacion","lugar__piso__ubicacion__sector__sector")
+                 .annotate(total=Sum("cantidad"),buenas=Sum("cantidad",filter=Q(estado="B")), pendientes=Sum("cantidad", filter=Q(estado = "P")),
+                           malas=Sum("cantidad", filter=Q(estado = "M")),).order_by("lugar__piso__ubicacion__sector__sector","lugar__piso__ubicacion__ubicacion"))
+    resumen_ubic = list(qs_ubic)
+    _add_percentages(resumen_ubic)
+
+    qs_obj = (ObjetoLugar.objects.values("tipo_de_objeto__objeto__id","tipo_de_objeto__objeto__nombre_del_objeto",)
+                 .annotate(total=Sum("cantidad"),buenas=Sum("cantidad",filter=Q(estado="B")), pendientes=Sum("cantidad", filter=Q(estado = "P")),
+                           malas=Sum("cantidad", filter=Q(estado = "M")),).order_by("tipo_de_objeto__objeto__nombre_del_objeto"))
+    resumen_obj = list(qs_obj)
+    _add_percentages(resumen_obj)
+
+    malos_qs = (ObjetoLugar.objects.filter(estado="M").select_related("lugar__piso__ubicacion__sector", "lugar__piso__ubicacion", "lugar__piso","lugar","tipo_de_objeto__objeto")
+                .order_by("tipo_de_objeto__objeto__nombre_del_objeto", "lugar__piso__ubicacion__sector__sector", "lugar__piso__ubicacion__ubicacion", "lugar__piso__piso", "lugar__nombre_del_lugar",))
+    malos_por_objeto = {}
+    for ol in malos_qs:
+        oid = ol.tipo_de_objeto.objeto_id
+        malos_por_objeto.setdefault(oid,[]).append(ol)
+
+    resumen_objetos=[]
+    for r in resumen_obj:
+        oid = r["tipo_de_objeto__objeto__id"]
+        resumen_objetos.append(
+            {
+                "id": oid,
+                "nombre":r["tipo_de_objeto__objeto__nombre_del_objeto"],
+                "total": r["total"] or 0,
+                "buenas":r["buenas"] or 0,
+                "pendientes": r["pendientes"] or 0,
+                "malas": r["malas"] or 0,
+                "pct_buenas": r["pct_buenas"],
+                "pct_pendientes":r["pct_pendientes"],
+                "pct_malas":r["pct_malas"],
+                "malos": malos_por_objeto.get(oid, []),
+
+            }
+        )
+        contexto = {
+            "resumen_sector": resumen_sector,
+            "resumen_ubic":resumen_ubic,
+            "resumen_objetos":resumen_objetos,
+        }
+    return render(request, "resumen/resumen_general.html", contexto)

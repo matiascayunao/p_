@@ -82,7 +82,9 @@ urlpatterns = [
     path("objetos-lugar/<int:objeto_lugar_id>/historico/crear/", views.crear_historico, name="crear_historico"),
 
 
-    # urls.py
+    # ESTRUCTURA
     path("estructura/crear/", views.crear_estructura, name="crear_estructura"),
 
+    # RESUMEN
+    path("resumen/", views.resumen_general, name="resumen_general"),
 ]

@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">Reportes / Resúmenes</h2>
+    <div class="card mb-4">
+        <div class="card-header">
+            <strong>Resumen por sector</strong>
+        </div>
+        <div class="card-body p-3">
+            {% if resumen_sector %}
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>Sector</th>
+                            <th class="text-end">Total cant.</th>
+                            <th class="text-end">% Bueno</th>
+                            <th class="text-end">% Pendiente</th>
+                            <th class="text-end">% Malo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in resumen_sector %}
+                        <tr>
+                            <td>{{r.lugar__piso__ubicacion__sector__sector}}</td>
+                            <td class="text-end">{{ r.total|default:0 }}</td>
+                            <td class="text-end">{{ r.pct_buenas }}%</td>
+                            <td class="text-end">{{ r.pct_pendientes }}%</td>
+                            <td class="text-end">{{ r.pct_malas }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">No hay datos de objetos para calcular el resumen por sector.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <strong>Resumen por ubicación</strong>
+        </div>
+        <div class="card-body p-3">
+            {% if resumen_ubic %}
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>Sector</th>
+                            <th>Ubicación</th>
+                            <th class="text-end">Total cant.</th>
+                            <th class="text-end">% Bueno</th>
+                            <th class="text-end">% Pendiente</th>
+                            <th class="text-end">% Malo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in resumen_ubic %}
+                        <tr>
+                            <td>{{r.lugar__piso__ubicacion__sector__sector}}</td>
+                            <td>{{r.lugar__piso__ubicacion__ubicacion}}</td>
+                            <td class="text-end">{{ r.total|default:0 }}</td>
+                            <td class="text-end">{{ r.pct_buenas }}%</td>
+                            <td class="text-end">{{ r.pct_pendientes }}%</td>
+                            <td class="text-end">{{ r.pct_malas }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">No hay datos de objetos para calcular el resumen por ubicación.</p>
+            {% endif %}
+        </div>
+    </div>
+
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <strong>Resumen por objeto (Puerto Completo) </strong>
+            <small class="text-muted d-block" >Muestra el porcentaje de estado del objeto y dónde está en estado <em>Malo</em>.</small>
+        </div>
+        <div class="card-body p-3">
+            {% if resumen_objetos %}
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>Objeto</th>
+                            <th class="text-end">Total cant.</th>
+                            <th class="text-end">% Bueno</th>
+                            <th class="text-end">% Pendiente</th>
+                            <th class="text-end">% Malo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for obj in resumen_objetos %}
+                        <tr class="table-light">
+                            <td><strong>{{obj.nombre}}</strong></td>
+                            <td class="text-end">{{obj.total}}</td>
+                            <td class="text-end">{{obj.pct_buenas}}%</td>
+                            <td class="text-end">{{obj.pct_pendientes}}%</td>
+                            <td class="text-end">{{obj.pct_malas}}%</td>
+                        </tr>
+                        {% if obj.malos %}
+                        <tr>
+                            <td colspan="5">
+                                <small class="text-muted d-block mb-1">Lugares donde este objeto está en estado <strong>Malo</strong>:</small>
+                                <ul class="mb-0">
+                                    {% for ol in obj.malos %}
+                                    <li>
+                                        {{ol.lugar.piso.ubicacion.sector.sector}} 
+                                        {{ol.lugar.piso.ubicacion.ubicacion}}
+                                        {{ol.lugar.piso.piso}}
+                                        {{ol.lugar.nombre_del_lugar}}
+                                        (cant: {{ol.cantidad}})
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                        </tr>
+                        {% endif %}
+
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">No hay datos de objetos para calcular el resumen por objeto.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}
