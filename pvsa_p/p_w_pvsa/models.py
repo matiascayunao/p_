@@ -3,14 +3,15 @@ from django.utils import timezone
 
 
 class Sector(models.Model):
-    sector = models.CharField(max_length=100, unique=True )
+    sector = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
-        return f"Sector: {self.sector}"
+        # Solo el nombre del sector
+        return self.sector
 
 
 class Ubicacion(models.Model):
-    ubicacion = models.CharField(max_length=100, unique=True )
+    ubicacion = models.CharField(max_length=100, unique=True)
     sector = models.ForeignKey(
         Sector,
         verbose_name="sector",
@@ -18,7 +19,8 @@ class Ubicacion(models.Model):
     )
 
     def __str__(self):
-        return f"Ubicación: {self.ubicacion}"
+        # Ubicación + sector al que pertenece
+        return f"{self.ubicacion} | Sector: {self.sector.sector}"
 
 
 class Piso(models.Model):
@@ -30,14 +32,16 @@ class Piso(models.Model):
     )
 
     def __str__(self):
-        return f"Piso: {self.piso} | Ubicación: {self.ubicacion}"
+        # Piso + ubicación
+        return f"Piso {self.piso} | {self.ubicacion.ubicacion}"
 
 
 class TipoLugar(models.Model):
-    tipo_de_lugar = models.CharField(max_length=100, unique=True )
+    tipo_de_lugar = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
-        return f"Tipo de lugar: {self.tipo_de_lugar}"
+        # Nombre del tipo de lugar
+        return self.tipo_de_lugar
 
 
 class Lugar(models.Model):
@@ -54,18 +58,28 @@ class Lugar(models.Model):
     )
 
     def __str__(self):
-        return f"Lugar: {self.nombre_del_lugar}"
+        # Nombre del lugar + piso + ubicación
+        return (
+            f"{self.nombre_del_lugar} | "
+            f"Piso {self.piso.piso} | "
+            f"{self.piso.ubicacion.ubicacion}"
+        )
 
 
 class CategoriaObjeto(models.Model):
-    nombre_de_categoria = models.CharField(max_length=100, verbose_name="categoría", unique=True )
+    nombre_de_categoria = models.CharField(
+        max_length=100, verbose_name="categoría", unique=True
+    )
 
     def __str__(self):
-        return f"Categoria: {self.nombre_de_categoria}"
+        # Solo el nombre de la categoría
+        return self.nombre_de_categoria
 
 
 class Objeto(models.Model):
-    nombre_del_objeto = models.CharField(max_length=100, verbose_name="objeto", unique=True )
+    nombre_del_objeto = models.CharField(
+        max_length=100, verbose_name="objeto", unique=True
+    )
     objeto_categoria = models.ForeignKey(
         CategoriaObjeto,
         verbose_name="categoria",
@@ -73,7 +87,8 @@ class Objeto(models.Model):
     )
 
     def __str__(self):
-        return f"Objeto: {self.nombre_del_objeto} | {self.objeto_categoria}"
+        # Objeto + categoría entre paréntesis
+        return f"{self.nombre_del_objeto} ({self.objeto_categoria.nombre_de_categoria})"
 
 
 class TipoObjeto(models.Model):
@@ -86,7 +101,8 @@ class TipoObjeto(models.Model):
     material = models.CharField(max_length=100, verbose_name="material")
 
     def __str__(self):
-        return f"Tipo de objeto: {self.objeto} | Marca: {self.marca} | Material: {self.material}"
+        # Objeto + marca + material, ideal para combos
+        return f"{self.objeto.nombre_del_objeto} - {self.marca} {self.material}"
 
 
 class ObjetoLugar(models.Model):
@@ -118,14 +134,18 @@ class ObjetoLugar(models.Model):
     )
 
     def __str__(self):
+        # Resumen corto: qué objeto es, dónde está y su estado/cantidad
+        lugar_txt = (
+            f"{self.lugar.nombre_del_lugar} | "
+            f"Piso {self.lugar.piso.piso} | {self.lugar.piso.ubicacion.ubicacion}"
+            if self.lugar
+            else "Sin lugar asignado"
+        )
         return (
-            f"Lugar: {self.lugar} | "
-            f"Tipo de objeto: {self.tipo_de_objeto.objeto.nombre_del_objeto} | "
-            f"Marca: {self.tipo_de_objeto.marca} | "
-            f"Material: {self.tipo_de_objeto.material or '-'} | "
-            f"Cant.: {self.cantidad} | "
-            f"Estado: {self.get_estado_display()} | "
-            f"Fecha: {self.fecha.strftime('%d/%m/%Y')}"
+            f"{self.tipo_de_objeto.objeto.nombre_del_objeto} "
+            f"- {self.tipo_de_objeto.marca} {self.tipo_de_objeto.material or ''} "
+            f"en {lugar_txt} "
+            f"(cant. {self.cantidad}, estado {self.get_estado_display()})"
         )
 
     def save(self, *args, **kwargs):
@@ -174,13 +194,19 @@ class HistoricoObjeto(models.Model):
     fecha_anterior = models.DateField()
 
     def __str__(self):
+        # Qué objeto es, dónde estaba y cuál era la situación anterior
         obj = self.objeto_del_lugar
+        lugar_txt = (
+            f"{obj.lugar.nombre_del_lugar} | "
+            f"Piso {obj.lugar.piso.piso} | {obj.lugar.piso.ubicacion.ubicacion}"
+            if obj.lugar
+            else "Sin lugar asignado"
+        )
         return (
-            f"Histórico de lugar: {obj.lugar} | "
-            f"Tipo de objeto: {obj.tipo_de_objeto.objeto.nombre_del_objeto} | "
-            f"Marca: {obj.tipo_de_objeto.marca} | "
-            f"Material: {obj.tipo_de_objeto.material or '-'} | "
-            f"Cant. ant.: {self.cantidad_anterior} | "
-            f"Estado ant.: {self.get_estado_anterior_display()} | "
-            f"Fecha ant.: {self.fecha_anterior.strftime('%d/%m/%Y')}"
+            f"Histórico de {obj.tipo_de_objeto.objeto.nombre_del_objeto} "
+            f"- {obj.tipo_de_objeto.marca} {obj.tipo_de_objeto.material or ''} "
+            f"en {lugar_txt} "
+            f"(cant. ant. {self.cantidad_anterior}, "
+            f"estado ant. {self.get_estado_anterior_display()}, "
+            f"fecha {self.fecha_anterior.strftime('%d/%m/%Y')})"
         )

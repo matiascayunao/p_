@@ -3,35 +3,65 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <title>PVSA</title>
 
+    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
           integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
           crossorigin="anonymous">
+
+    <!-- Estilos mínimos propios -->
+    <style>
+      body {
+        background-color: #f5f7fa;
+      }
+      .navbar-pvsa {
+        background: #06b6b9;
+      }
+      .navbar-pvsa .nav-link,
+      .navbar-pvsa .navbar-brand {
+        color: #ffffff !important;
+      }
+      .navbar-pvsa .dropdown-menu {
+        font-size: .9rem;
+      }
+      main {
+        min-height: calc(100vh - 56px);
+      }
+      footer {
+        font-size: .8rem;
+      }
+    </style>
   </head>
 
   <body>
 
-    <nav class="navbar navbar-expand-lg navbar-dark shadow-sm" style="background-color:#3EC7C2;">
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-pvsa shadow-sm">
       <div class="container-fluid px-3">
 
-        <!-- IZQUIERDA -->
-        <a class="navbar-brand fw-bold text-white" href="{% url 'home' %}">PVSA</a>
+        <!-- Marca -->
+        <a class="navbar-brand fw-bold" href="{% url 'home' %}">
+          PVSA
+        </a>
 
         {% if user.is_authenticated %}
+          <!-- Botón hamburguesa -->
           <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarPVSA"
                   aria-controls="navbarPVSA" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
           </button>
 
+          <!-- Contenido colapsable -->
           <div class="collapse navbar-collapse" id="navbarPVSA">
 
-            <!-- CENTRO -->
+            <!-- Menú central -->
             <ul class="navbar-nav mx-auto align-items-lg-center gap-lg-1">
 
               <!-- SECTOR -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
                   SECTOR
                 </a>
                 <ul class="dropdown-menu">
@@ -42,7 +72,7 @@
 
               <!-- UBICACION -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
                   UBICACION
                 </a>
                 <ul class="dropdown-menu">
@@ -53,7 +83,7 @@
 
               <!-- PISO -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
                   PISO
                 </a>
                 <ul class="dropdown-menu">
@@ -64,7 +94,7 @@
 
               <!-- LUGAR -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
                   LUGAR
                 </a>
                 <ul class="dropdown-menu">
@@ -75,7 +105,7 @@
 
               <!-- TIPO DE LUGAR -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
                   TIPO DE LUGAR
                 </a>
                 <ul class="dropdown-menu">
@@ -84,9 +114,9 @@
                 </ul>
               </li>
 
-              <!-- CATEGORIA DEL OBJETO -->
+              <!-- CATEGORIA -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
                   CATEGORIA DEL OBJETO
                 </a>
                 <ul class="dropdown-menu">
@@ -97,7 +127,7 @@
 
               <!-- OBJETO -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
                   OBJETO
                 </a>
                 <ul class="dropdown-menu">
@@ -108,7 +138,7 @@
 
               <!-- TIPO DE OBJETO -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
                   TIPO DE OBJETO
                 </a>
                 <ul class="dropdown-menu">
@@ -119,7 +149,7 @@
 
               <!-- OBJETO DEL LUGAR -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
                   OBJETO DEL LUGAR
                 </a>
                 <ul class="dropdown-menu">
@@ -129,7 +159,7 @@
 
               <!-- HISTORICO -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
+                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
                   HISTORICO
                 </a>
                 <ul class="dropdown-menu">
@@ -138,14 +168,13 @@
               </li>
             </ul>
 
+            <!-- Usuario -->
             <ul class="navbar-nav ms-auto">
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold text-white" href="#" role="button" data-bs-toggle="dropdown">
-                {{ user.username }}
+                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
+                  {{ user.username }}
                 </a>
-
                 <ul class="dropdown-menu dropdown-menu-end">
-
                   {% if user.is_staff or user.is_superuser %}
                     <li>
                       <a class="dropdown-item" href="/admin/">Panel Admin</a>
@@ -153,7 +182,6 @@
                     </li>
                     <li><hr class="dropdown-divider"></li>
                   {% endif %}
-
                   <li>
                     <a class="dropdown-item" href="{% url 'signout' %}">Cerrar sesión</a>
                   </li>
@@ -166,8 +194,35 @@
       </div>
     </nav>
 
-    {% block content %}{% endblock %}
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="py-4">
+      <div class="container">
 
+        <!-- Mensajes de Django -->
+        {% if messages %}
+          <div class="mb-3">
+            {% for message in messages %}
+              <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    <!-- FOOTER sencillo -->
+    <footer class="border-top bg-white py-2">
+      <div class="container d-flex justify-content-between">
+        <span class="text-muted">PVSA · Sistema de registro de activos</span>
+        <span class="text-muted">v1.0</span>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
             crossorigin="anonymous"></script>

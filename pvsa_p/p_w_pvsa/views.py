@@ -16,7 +16,7 @@ from .forms import (
     EditarSector, EditarUbicacion, EditarPiso, EditarLugar,
     EditarTipoLugar, EditarCategoria, EditarObjeto,
     EditarTipoObjeto, EditarObjetoLugar, EditarHistorico,
-    BaseEstructuraForm, ObjetoLugarFilaFormSet,
+    EstructuraCompletaForm, ObjetoLugarFilaFormSet, 
 )
 
 from .models import (
@@ -42,98 +42,105 @@ def descargar_excel_sectores(request):
 @transaction.atomic
 def crear_estructura(request):
     if request.method == "POST":
-        base_form = BaseEstructuraForm(request.POST)
+        form = EstructuraCompletaForm(request.POST)
         objetos_formset = ObjetoLugarFilaFormSet(request.POST, prefix="obj")
 
-        if base_form.is_valid() and objetos_formset.is_valid():
-            cd = base_form.cleaned_data
+        if form.is_valid() and objetos_formset.is_valid():
+            cd = form.cleaned_data
 
-            sector_nombre = cd["sector"].strip()
-            ubicacion_nombre = cd["ubicacion"].strip()
-            piso_num = cd["piso"]
-            nombre_lugar = cd["nombre_del_lugar"].strip()
+            # -----------------------
+            # 1) SECTOR
+            # -----------------------
+            sector = cd.get("sector_existente")
+            sector_nuevo = (cd.get("sector_nuevo") or "").strip()
+            if not sector and sector_nuevo:
+                sector, _ = Sector.objects.get_or_create(sector=sector_nuevo)
 
-            # Tipo de lugar: existente o nuevo
-            tipo_lugar = cd.get("tipo_lugar_existente")
-            if not tipo_lugar:
-                tipo_lugar, _ = TipoLugar.objects.get_or_create(
-                    tipo_de_lugar=cd["nuevo_tipo_lugar"].strip()
+            # -----------------------
+            # 2) UBICACIÓN
+            # -----------------------
+            ubicacion = cd.get("ubicacion_existente")
+            ubicacion_nueva = (cd.get("ubicacion_nueva") or "").strip()
+            if not ubicacion and ubicacion_nueva:
+                ubicacion, _ = Ubicacion.objects.get_or_create(
+                    ubicacion=ubicacion_nueva,
+                    sector=sector,
                 )
 
-            sector, _ = Sector.objects.get_or_create(sector=sector_nombre)
-            ubicacion, _ = Ubicacion.objects.get_or_create(
-                ubicacion=ubicacion_nombre,
-                sector=sector,
-            )
-            piso, _ = Piso.objects.get_or_create(
-                piso=piso_num,
-                ubicacion=ubicacion,
-            )
+            # -----------------------
+            # 3) PISO
+            # -----------------------
+            piso = cd.get("piso_existente")
+            piso_nuevo = cd.get("piso_nuevo")
+            if not piso and piso_nuevo not in (None, ""):
+                piso, _ = Piso.objects.get_or_create(
+                    piso=piso_nuevo,
+                    ubicacion=ubicacion,
+                )
 
+            # -----------------------
+            # 4) TIPO DE LUGAR
+            # -----------------------
+            tipo_lugar = cd.get("tipo_lugar_existente")
+            tipo_lugar_nuevo = (cd.get("tipo_lugar_nuevo") or "").strip()
+            if not tipo_lugar and tipo_lugar_nuevo:
+                tipo_lugar, _ = TipoLugar.objects.get_or_create(
+                    tipo_de_lugar=tipo_lugar_nuevo
+                )
+
+            # -----------------------
+            # 5) LUGAR
+            # -----------------------
+            nombre_lugar = cd["nombre_del_lugar"].strip()
             lugar = Lugar.objects.create(
                 nombre_del_lugar=nombre_lugar,
                 piso=piso,
                 lugar_tipo_lugar=tipo_lugar,
             )
 
-            # ---- filas de objetos ----
+            # -----------------------
+            # 6) OBJETOS DEL LUGAR
+            # -----------------------
             for f in objetos_formset:
                 if not f.cleaned_data:
+                    continue
+                if f.cleaned_data.get("__empty__"):
                     continue
 
                 row = f.cleaned_data
 
-                # Si está completamente vacía, la saltamos
-                if not any(
-                    row.get(k)
-                    for k in [
-                        "tipo_de_objeto", "cantidad", "estado", "detalle",
-                        "nueva_categoria", "nuevo_objeto", "marca", "material",
-                    ]
-                ):
-                    continue
-
-                tipo_obj = row.get("tipo_de_objeto")
-                cantidad = row.get("cantidad") or 1
-                estado = row.get("estado") or "B"
-                detalle = row.get("detalle") or ""
-
-                nueva_categoria = (row.get("nueva_categoria") or "").strip()
-                nuevo_objeto = (row.get("nuevo_objeto") or "").strip()
-                marca = (row.get("marca") or "").strip()
-                material = (row.get("material") or "").strip()
-
-                # Si NO se seleccionó un tipo de objeto existente,
-                # intentamos crear categoría / objeto / tipo_objeto
-                if not tipo_obj:
-                    if not nuevo_objeto:
-                        # No hay tipo existente ni nombre nuevo -> ignoramos fila
-                        continue
-
-                    # Categoría
-                    if nueva_categoria:
-                        categoria, _ = CategoriaObjeto.objects.get_or_create(
-                            nombre_de_la_categoria=nueva_categoria
-                        )
-                    else:
-                        categoria, _ = CategoriaObjeto.objects.get_or_create(
-                            nombre_de_la_categoria="Sin categoría"
-                        )
-
-                    # Objeto
-                    objeto, _ = Objeto.objects.get_or_create(
-                        nombre_del_objeto=nuevo_objeto,
-                        categoria=categoria,
+                # --- Categoría ---
+                categoria = row.get("categoria_existente")
+                if not categoria:
+                    nombre_cat = (row.get("categoria_nueva") or "").strip()
+                    categoria, _ = CategoriaObjeto.objects.get_or_create(
+                        nombre_de_categoria=nombre_cat
                     )
 
-                    # Tipo de objeto
+                # --- Objeto ---
+                objeto = row.get("objeto_existente")
+                if not objeto:
+                    nombre_obj = (row.get("objeto_nuevo") or "").strip()
+                    objeto, _ = Objeto.objects.get_or_create(
+                        nombre_del_objeto=nombre_obj,
+                        objeto_categoria=categoria,
+                    )
+
+                # --- Tipo de objeto ---
+                tipo_obj = row.get("tipo_objeto_existente")
+                if not tipo_obj:
+                    marca = (row.get("marca") or "").strip()
+                    material = (row.get("material") or "").strip()
                     tipo_obj, _ = TipoObjeto.objects.get_or_create(
                         objeto=objeto,
-                        marca=marca or "",
-                        material=material or "",
+                        marca=marca,
+                        material=material,
                     )
 
-                # Finalmente creamos el ObjetoLugar
+                cantidad = row.get("cantidad") or 0
+                estado = row.get("estado") or "B"
+                detalle = (row.get("detalle") or "").strip()
+
                 ObjetoLugar.objects.create(
                     lugar=lugar,
                     tipo_de_objeto=tipo_obj,
@@ -142,16 +149,20 @@ def crear_estructura(request):
                     detalle=detalle,
                 )
 
+            # Redirige al detalle del lugar recién creado
             return redirect("detalle_lugar", lugar_id=lugar.id)
 
     else:
-        base_form = BaseEstructuraForm()
+        form = EstructuraCompletaForm()
         objetos_formset = ObjetoLugarFilaFormSet(prefix="obj")
 
     return render(
         request,
-        "crear_estructura.html",
-        {"base_form": base_form, "objetos_formset": objetos_formset},
+        "crear_estructura.html",  # cambia este nombre si tu template es otro
+        {
+            "form": form,
+            "objetos_formset": objetos_formset,
+        },
     )
 
 
@@ -295,8 +306,35 @@ def borrar_sector(request, sector_id):
 
 @login_required
 def lista_ubicaciones(request):
-    ubicaciones = Ubicacion.objects.select_related("sector").all().order_by("ubicacion")
-    return render(request, "ubicacion/ubicaciones.html", {"ubicaciones": ubicaciones})
+    # id de sector recibido por GET ?sector=3
+    sector_id = request.GET.get("sector", "").strip()
+
+    # query base
+    ubicaciones_qs = Ubicacion.objects.select_related("sector").all()
+
+    # si viene sector, filtramos
+    if sector_id:
+        try:
+            ubicaciones_qs = ubicaciones_qs.filter(sector_id=int(sector_id))
+        except ValueError:
+            # si viene algo raro, ignoramos el filtro
+            sector_id = ""
+
+    ubicaciones = ubicaciones_qs.order_by("ubicacion")
+
+    # para armar el combo
+    sectores = Sector.objects.all().order_by("sector")
+
+    return render(
+        request,
+        "ubicacion/ubicaciones.html",
+        {
+            "ubicaciones": ubicaciones,
+            "sectores": sectores,
+            "sector_actual": sector_id,  # lo usamos para marcar el option seleccionado
+        },
+    )
+
 
 
 @login_required
@@ -360,12 +398,34 @@ def borrar_ubicacion(request, ubicacion_id):
 
 @login_required
 def lista_pisos(request):
-    pisos = (
-        Piso.objects.select_related("ubicacion", "ubicacion__sector")
-        .all()
-        .order_by("ubicacion__ubicacion", "piso")
+    # ?ubicacion=ID que llega por GET
+    ubicacion_id = request.GET.get("ubicacion", "").strip()
+
+    # queryset base
+    pisos_qs = Piso.objects.select_related("ubicacion", "ubicacion__sector").all()
+
+    # si viene ubicación, filtramos por esa ubicación
+    if ubicacion_id:
+        try:
+            pisos_qs = pisos_qs.filter(ubicacion_id=int(ubicacion_id))
+        except ValueError:
+            ubicacion_id = ""  # si viene algo raro, ignoramos el filtro
+
+    pisos = pisos_qs.order_by("ubicacion__ubicacion", "piso")
+
+    # para llenar el combo de ubicaciones
+    ubicaciones = Ubicacion.objects.select_related("sector").all().order_by("ubicacion")
+
+    return render(
+        request,
+        "piso/pisos.html",  # deja aquí la ruta que ya usas
+        {
+            "pisos": pisos,
+            "ubicaciones": ubicaciones,
+            "ubicacion_actual": ubicacion_id,
+        },
     )
-    return render(request, "piso/pisos.html", {"pisos": pisos})
+
 
 
 @login_required
@@ -436,14 +496,59 @@ def borrar_piso(request, piso_id):
 
 @login_required
 def lista_lugares(request):
-    lugares = (
-        Lugar.objects.select_related(
-            "piso", "piso__ubicacion", "piso__ubicacion__sector", "lugar_tipo_lugar"
-        )
-        .all()
-        .order_by("nombre_del_lugar")
+    ubicacion_id = request.GET.get("ubicacion", "").strip()
+    piso_id = request.GET.get("piso", "").strip()
+
+    # queryset base
+    lugares_qs = Lugar.objects.select_related(
+        "piso",
+        "piso__ubicacion",
+        "piso__ubicacion__sector",
+    ).all()
+
+    # filtro por ubicación
+    if ubicacion_id:
+        try:
+            u_id = int(ubicacion_id)
+            lugares_qs = lugares_qs.filter(piso__ubicacion_id=u_id)
+        except ValueError:
+            ubicacion_id = ""
+
+    # filtro por piso
+    if piso_id:
+        try:
+            p_id = int(piso_id)
+            lugares_qs = lugares_qs.filter(piso_id=p_id)
+        except ValueError:
+            piso_id = ""
+
+    lugares = lugares_qs.order_by(
+        "piso__ubicacion__ubicacion",
+        "piso__piso",
+        "nombre_del_lugar",
     )
-    return render(request, "lugar/lugares.html", {"lugares": lugares})
+
+    # combos
+    ubicaciones = Ubicacion.objects.select_related("sector").all().order_by("ubicacion")
+    # OJO: aquí mandamos **todos** los pisos; el JS se encarga de filtrarlos en el combo
+    pisos = Piso.objects.select_related("ubicacion").all().order_by(
+        "ubicacion__ubicacion",
+        "piso",
+    )
+
+    return render(
+        request,
+        "lugar/lugares.html",
+        {
+            "lugares": lugares,
+            "ubicaciones": ubicaciones,
+            "pisos": pisos,
+            "ubicacion_actual": ubicacion_id,
+            "piso_actual": piso_id,
+        },
+    )
+
+
 
 
 @login_required
@@ -518,13 +623,95 @@ def borrar_lugar(request, lugar_id):
 
 @login_required
 def lista_objetos_lugar(request):
-    objetos = (
-        ObjetoLugar.objects
-        .select_related("lugar", "tipo_de_objeto", "tipo_de_objeto__objeto")
-        .all()
-        .order_by("-fecha")
+    lugar_id = request.GET.get("lugar", "").strip()
+    objeto_id = request.GET.get("objeto", "").strip()
+    tipo_id = request.GET.get("tipo", "").strip()
+    estado_val = request.GET.get("estado", "").strip()
+
+    qs = ObjetoLugar.objects.select_related(
+        "lugar",
+        "lugar__piso",
+        "lugar__piso__ubicacion",
+        "lugar__piso__ubicacion__sector",
+        "tipo_de_objeto",
+        "tipo_de_objeto__objeto",
+        "tipo_de_objeto__objeto__objeto_categoria",
+    ).all()
+
+    # Filtros
+    if lugar_id:
+        try:
+            qs = qs.filter(lugar_id=int(lugar_id))
+        except ValueError:
+            lugar_id = ""
+
+    if objeto_id:
+        try:
+            qs = qs.filter(tipo_de_objeto__objeto_id=int(objeto_id))
+        except ValueError:
+            objeto_id = ""
+
+    if tipo_id:
+        try:
+            qs = qs.filter(tipo_de_objeto_id=int(tipo_id))
+        except ValueError:
+            tipo_id = ""
+
+    if estado_val:
+        qs = qs.filter(estado=estado_val)
+
+    objetos_lugar = qs.order_by(
+        "lugar__piso__ubicacion__ubicacion",
+        "lugar__piso__piso",
+        "lugar__nombre_del_lugar",
+        "tipo_de_objeto__objeto__nombre_del_objeto",
     )
-    return render(request, "objeto_lugar/objetos_lugar.html", {"objetos": objetos})
+
+    # Datos para los combos
+    lugares = (
+        Lugar.objects.select_related(
+            "piso",
+            "piso__ubicacion",
+            "piso__ubicacion__sector",
+        )
+        .all()
+        .order_by(
+            "piso__ubicacion__ubicacion",
+            "piso__piso",
+            "nombre_del_lugar",
+        )
+    )
+
+    objetos = (
+        Objeto.objects.select_related("objeto_categoria")
+        .all()
+        .order_by("objeto_categoria__nombre_de_categoria", "nombre_del_objeto")
+    )
+
+    tipos = (
+        TipoObjeto.objects.select_related("objeto", "objeto__objeto_categoria")
+        .all()
+        .order_by("objeto__nombre_del_objeto", "marca", "material")
+    )
+
+    # choices del modelo (por ejemplo [("B", "Bueno"), ...])
+    estados = ObjetoLugar.ESTADO
+
+    return render(
+        request,
+        "objeto_lugar/objetos_lugar.html",  # <-- cambia la ruta si tu HTML está en otro lado
+        {
+            "objetos": objetos_lugar,
+            "lugares": lugares,
+            "objetos_catalogo": objetos,
+            "tipos": tipos,
+            "estados": estados,
+            "lugar_actual": lugar_id,
+            "objeto_actual": objeto_id,
+            "tipo_actual": tipo_id,
+            "estado_actual": estado_val,
+        },
+    )
 
 
 @login_required
@@ -771,10 +958,36 @@ def borrar_categoria(request, categoria_id):
 
 @login_required
 def lista_objetos(request):
-    objetos = Objeto.objects.select_related("objeto_categoria").all().order_by(
-        "nombre_del_objeto"
+    # ?categoria=ID que llega por GET
+    categoria_id = request.GET.get("categoria", "").strip()
+
+    # queryset base
+    objetos_qs = Objeto.objects.select_related("objeto_categoria").all()
+
+    # si viene categoría, filtramos
+    if categoria_id:
+        try:
+            objetos_qs = objetos_qs.filter(objeto_categoria_id=int(categoria_id))
+        except ValueError:
+            categoria_id = ""  # si viene algo raro, ignoramos el filtro
+
+    objetos = objetos_qs.order_by(
+        "objeto_categoria__nombre_de_categoria",
+        "nombre_del_objeto",
     )
-    return render(request, "objeto/objetos.html", {"objetos": objetos})
+
+    # para el combo de categorías
+    categorias = CategoriaObjeto.objects.all().order_by("nombre_de_categoria")
+
+    return render(
+        request,
+        "objeto/objetos.html",   # deja aquí la ruta real de tu template
+        {
+            "objetos": objetos,
+            "categorias": categorias,
+            "categoria_actual": categoria_id,
+        },
+    )
 
 
 @login_required
@@ -845,12 +1058,60 @@ def borrar_objeto(request, objeto_id):
 
 @login_required
 def lista_tipos_objeto(request):
-    tipos = (
-        TipoObjeto.objects.select_related("objeto", "objeto__objeto_categoria")
-        .all()
-        .order_by("objeto__nombre_del_objeto", "marca")
+    # ?categoria=ID & ?objeto=ID
+    categoria_id = request.GET.get("categoria", "").strip()
+    objeto_id = request.GET.get("objeto", "").strip()
+
+    # queryset base
+    tipos_qs = TipoObjeto.objects.select_related(
+        "objeto",
+        "objeto__objeto_categoria",
+    ).all()
+
+    # filtro por categoría (a través del objeto)
+    if categoria_id:
+        try:
+            c_id = int(categoria_id)
+            tipos_qs = tipos_qs.filter(objeto__objeto_categoria_id=c_id)
+        except ValueError:
+            categoria_id = ""
+
+    # filtro por objeto
+    if objeto_id:
+        try:
+            o_id = int(objeto_id)
+            tipos_qs = tipos_qs.filter(objeto_id=o_id)
+        except ValueError:
+            objeto_id = ""
+
+    tipos_objeto = tipos_qs.order_by(
+        "objeto__objeto_categoria__nombre_de_categoria",
+        "objeto__nombre_del_objeto",
+        "marca",
+        "material",
     )
-    return render(request, "tipo_objeto/tipos_objeto.html", {"tipos": tipos})
+
+    # ===== combos =====
+    categorias = CategoriaObjeto.objects.all().order_by("nombre_de_categoria")
+
+    # mandamos TODOS los objetos, el JS se encarga de mostrar sólo los de la categoría elegida
+    objetos = Objeto.objects.select_related("objeto_categoria").all().order_by(
+        "objeto_categoria__nombre_de_categoria",
+        "nombre_del_objeto",
+    )
+
+    return render(
+        request,
+        "tipo_objeto/tipos_objeto.html",  # ajusta la ruta si tu template está en otro lado
+        {
+            "tipos_objeto": tipos_objeto,
+            "categorias": categorias,
+            "objetos": objetos,
+            "categoria_actual": categoria_id,
+            "objeto_actual": objeto_id,
+        },
+    )
+
 
 
 @login_required
@@ -929,17 +1190,96 @@ def borrar_tipo_objeto(request, tipo_objeto_id):
 
 @login_required
 def lista_historicos(request):
-    historicos = (
-        HistoricoObjeto.objects.select_related(
-            "objeto_del_lugar",
-            "objeto_del_lugar__lugar",
-            "objeto_del_lugar__tipo_de_objeto",
-            "objeto_del_lugar__tipo_de_objeto__objeto",
+    lugar_id = request.GET.get("lugar", "").strip()
+    objeto_id = request.GET.get("objeto", "").strip()
+    tipo_id = request.GET.get("tipo", "").strip()
+    estado_val = request.GET.get("estado", "").strip()
+
+    qs = HistoricoObjeto.objects.select_related(
+        "objeto_del_lugar",
+        "objeto_del_lugar__lugar",
+        "objeto_del_lugar__lugar__piso",
+        "objeto_del_lugar__lugar__piso__ubicacion",
+        "objeto_del_lugar__lugar__piso__ubicacion__sector",
+        "objeto_del_lugar__tipo_de_objeto",
+        "objeto_del_lugar__tipo_de_objeto__objeto",
+        "objeto_del_lugar__tipo_de_objeto__objeto__objeto_categoria",
+    ).all()
+
+    # ---- Filtros ----
+    if lugar_id:
+        try:
+            qs = qs.filter(objeto_del_lugar__lugar_id=int(lugar_id))
+        except ValueError:
+            lugar_id = ""
+
+    if objeto_id:
+        try:
+            qs = qs.filter(objeto_del_lugar__tipo_de_objeto__objeto_id=int(objeto_id))
+        except ValueError:
+            objeto_id = ""
+
+    if tipo_id:
+        try:
+            qs = qs.filter(objeto_del_lugar__tipo_de_objeto_id=int(tipo_id))
+        except ValueError:
+            tipo_id = ""
+
+    if estado_val:
+        qs = qs.filter(estado_anterior=estado_val)
+
+    historicos = qs.order_by(
+        "-fecha_anterior",
+        "objeto_del_lugar__lugar__piso__ubicacion__ubicacion",
+        "objeto_del_lugar__lugar__piso__piso",
+        "objeto_del_lugar__lugar__nombre_del_lugar",
+    )
+
+    # ---- datos para los combos ----
+    lugares = (
+        Lugar.objects.select_related(
+            "piso",
+            "piso__ubicacion",
+            "piso__ubicacion__sector",
         )
         .all()
-        .order_by("-fecha_anterior")
+        .order_by(
+            "piso__ubicacion__ubicacion",
+            "piso__piso",
+            "nombre_del_lugar",
+        )
     )
-    return render(request, "historico/historicos.html", {"historicos": historicos})
+
+    objetos = (
+        Objeto.objects.select_related("objeto_categoria")
+        .all()
+        .order_by("objeto_categoria__nombre_de_categoria", "nombre_del_objeto")
+    )
+
+    tipos = (
+        TipoObjeto.objects.select_related("objeto", "objeto__objeto_categoria")
+        .all()
+        .order_by("objeto__nombre_del_objeto", "marca", "material")
+    )
+
+    # choices del campo estado_anterior
+    estados = HistoricoObjeto._meta.get_field("estado_anterior").choices
+
+    return render(
+        request,
+        "historico/historicos.html",   # pon aquí la ruta real de tu template
+        {
+            "historicos": historicos,
+            "lugares": lugares,
+            "objetos_catalogo": objetos,
+            "tipos": tipos,
+            "estados": estados,
+            "lugar_actual": lugar_id,
+            "objeto_actual": objeto_id,
+            "tipo_actual": tipo_id,
+            "estado_actual": estado_val,
+        },
+    )
 
 
 @login_required
@@ -1037,62 +1377,246 @@ def _add_percentages(rows):
         p = r.get("pendientes") or 0
         m = r.get("malas") or 0
 
-        if total ==0:
-            r["pct_buenas"] = r["pct_pendientes"] = r["pct_malas"] = 0
+        if total == 0:
+            r["pct_buenas"] = 0
+            r["pct_pendientes"] = 0
+            r["pct_malas"] = 0
         else:
             r["pct_buenas"] = round(b * 100 / total, 1)
             r["pct_pendientes"] = round(p * 100 / total, 1)
             r["pct_malas"] = round(m * 100 / total, 1)
     return rows
 
-def resumen_general(request):
 
-    qs_sector = (ObjetoLugar.objects.values("lugar__piso__ubicacion__sector__id","lugar__piso__ubicacion__sector__sector")
-                 .annotate(total=Sum("cantidad"),buenas=Sum("cantidad",filter=Q(estado="B")), pendientes=Sum("cantidad", filter=Q(estado = "P")),
-                           malas=Sum("cantidad", filter=Q(estado = "M")),).order_by("lugar__piso__ubicacion__sector__sector"))
+def resumen_general(request):
+    # -------- filtros GET --------
+    sector_id = request.GET.get("sector", "").strip()
+    ubicacion_id = request.GET.get("ubicacion", "").strip()
+    piso_id = request.GET.get("piso", "").strip()
+    tipo_lugar_id = request.GET.get("tipo_lugar", "").strip()
+    categoria_id = request.GET.get("categoria", "").strip()
+    objeto_id = request.GET.get("objeto", "").strip()
+    tipo_objeto_id = request.GET.get("tipo_objeto", "").strip()
+    estado_val = request.GET.get("estado", "").strip()
+
+    # queryset base de ObjetoLugar (con todos los select_related necesarios)
+    base_qs = ObjetoLugar.objects.select_related(
+        "lugar",
+        "lugar__piso",
+        "lugar__piso__ubicacion",
+        "lugar__piso__ubicacion__sector",
+        "lugar__lugar_tipo_lugar",
+        "tipo_de_objeto",
+        "tipo_de_objeto__objeto",
+        "tipo_de_objeto__objeto__objeto_categoria",
+    ).all()
+
+    # -------- aplicar filtros al queryset base --------
+    if sector_id:
+        try:
+            base_qs = base_qs.filter(lugar__piso__ubicacion__sector_id=int(sector_id))
+        except ValueError:
+            sector_id = ""
+
+    if ubicacion_id:
+        try:
+            base_qs = base_qs.filter(lugar__piso__ubicacion_id=int(ubicacion_id))
+        except ValueError:
+            ubicacion_id = ""
+
+    if piso_id:
+        try:
+            base_qs = base_qs.filter(lugar__piso_id=int(piso_id))
+        except ValueError:
+            piso_id = ""
+
+    if tipo_lugar_id:
+        try:
+            base_qs = base_qs.filter(lugar__tipo_de_lugar_id=int(tipo_lugar_id))
+        except ValueError:
+            tipo_lugar_id = ""
+
+    if categoria_id:
+        try:
+            base_qs = base_qs.filter(
+                tipo_de_objeto__objeto__objeto_categoria_id=int(categoria_id)
+            )
+        except ValueError:
+            categoria_id = ""
+
+    if objeto_id:
+        try:
+            base_qs = base_qs.filter(tipo_de_objeto__objeto_id=int(objeto_id))
+        except ValueError:
+            objeto_id = ""
+
+    if tipo_objeto_id:
+        try:
+            base_qs = base_qs.filter(tipo_de_objeto_id=int(tipo_objeto_id))
+        except ValueError:
+            tipo_objeto_id = ""
+
+    if estado_val:
+        base_qs = base_qs.filter(estado=estado_val)
+
+    # -------------------------------------------------
+    # RESUMEN POR SECTOR
+    # -------------------------------------------------
+    qs_sector = (
+        base_qs.values(
+            "lugar__piso__ubicacion__sector__id",
+            "lugar__piso__ubicacion__sector__sector",
+        )
+        .annotate(
+            total=Sum("cantidad"),
+            buenas=Sum("cantidad", filter=Q(estado="B")),
+            pendientes=Sum("cantidad", filter=Q(estado="P")),
+            malas=Sum("cantidad", filter=Q(estado="M")),
+        )
+        .order_by("lugar__piso__ubicacion__sector__sector")
+    )
     resumen_sector = list(qs_sector)
     _add_percentages(resumen_sector)
 
-    qs_ubic = (ObjetoLugar.objects.values("lugar__piso__ubicacion__id","lugar__piso__ubicacion__ubicacion","lugar__piso__ubicacion__sector__sector")
-                 .annotate(total=Sum("cantidad"),buenas=Sum("cantidad",filter=Q(estado="B")), pendientes=Sum("cantidad", filter=Q(estado = "P")),
-                           malas=Sum("cantidad", filter=Q(estado = "M")),).order_by("lugar__piso__ubicacion__sector__sector","lugar__piso__ubicacion__ubicacion"))
+    # -------------------------------------------------
+    # RESUMEN POR UBICACIÓN
+    # -------------------------------------------------
+    qs_ubic = (
+        base_qs.values(
+            "lugar__piso__ubicacion__id",
+            "lugar__piso__ubicacion__ubicacion",
+            "lugar__piso__ubicacion__sector__sector",
+        )
+        .annotate(
+            total=Sum("cantidad"),
+            buenas=Sum("cantidad", filter=Q(estado="B")),
+            pendientes=Sum("cantidad", filter=Q(estado="P")),
+            malas=Sum("cantidad", filter=Q(estado="M")),
+        )
+        .order_by(
+            "lugar__piso__ubicacion__sector__sector",
+            "lugar__piso__ubicacion__ubicacion",
+        )
+    )
     resumen_ubic = list(qs_ubic)
     _add_percentages(resumen_ubic)
 
-    qs_obj = (ObjetoLugar.objects.values("tipo_de_objeto__objeto__id","tipo_de_objeto__objeto__nombre_del_objeto",)
-                 .annotate(total=Sum("cantidad"),buenas=Sum("cantidad",filter=Q(estado="B")), pendientes=Sum("cantidad", filter=Q(estado = "P")),
-                           malas=Sum("cantidad", filter=Q(estado = "M")),).order_by("tipo_de_objeto__objeto__nombre_del_objeto"))
+    # -------------------------------------------------
+    # RESUMEN POR OBJETO
+    # -------------------------------------------------
+    qs_obj = (
+        base_qs.values(
+            "tipo_de_objeto__objeto__id",
+            "tipo_de_objeto__objeto__nombre_del_objeto",
+        )
+        .annotate(
+            total=Sum("cantidad"),
+            buenas=Sum("cantidad", filter=Q(estado="B")),
+            pendientes=Sum("cantidad", filter=Q(estado="P")),
+            malas=Sum("cantidad", filter=Q(estado="M")),
+        )
+        .order_by("tipo_de_objeto__objeto__nombre_del_objeto")
+    )
     resumen_obj = list(qs_obj)
     _add_percentages(resumen_obj)
 
-    malos_qs = (ObjetoLugar.objects.filter(estado="M").select_related("lugar__piso__ubicacion__sector", "lugar__piso__ubicacion", "lugar__piso","lugar","tipo_de_objeto__objeto")
-                .order_by("tipo_de_objeto__objeto__nombre_del_objeto", "lugar__piso__ubicacion__sector__sector", "lugar__piso__ubicacion__ubicacion", "lugar__piso__piso", "lugar__nombre_del_lugar",))
+    # lugares donde el objeto está en estado Malo (considerando también los filtros)
+    malos_qs = (
+        base_qs.filter(estado="M")
+        .select_related(
+            "lugar__piso__ubicacion__sector",
+            "lugar__piso__ubicacion",
+            "lugar__piso",
+            "lugar",
+            "tipo_de_objeto__objeto",
+        )
+        .order_by(
+            "tipo_de_objeto__objeto__nombre_del_objeto",
+            "lugar__piso__ubicacion__sector__sector",
+            "lugar__piso__ubicacion__ubicacion",
+            "lugar__piso__piso",
+            "lugar__nombre_del_lugar",
+        )
+    )
+
     malos_por_objeto = {}
     for ol in malos_qs:
         oid = ol.tipo_de_objeto.objeto_id
-        malos_por_objeto.setdefault(oid,[]).append(ol)
+        malos_por_objeto.setdefault(oid, []).append(ol)
 
-    resumen_objetos=[]
+    resumen_objetos = []
     for r in resumen_obj:
         oid = r["tipo_de_objeto__objeto__id"]
         resumen_objetos.append(
             {
                 "id": oid,
-                "nombre":r["tipo_de_objeto__objeto__nombre_del_objeto"],
+                "nombre": r["tipo_de_objeto__objeto__nombre_del_objeto"],
                 "total": r["total"] or 0,
-                "buenas":r["buenas"] or 0,
+                "buenas": r["buenas"] or 0,
                 "pendientes": r["pendientes"] or 0,
                 "malas": r["malas"] or 0,
                 "pct_buenas": r["pct_buenas"],
-                "pct_pendientes":r["pct_pendientes"],
-                "pct_malas":r["pct_malas"],
+                "pct_pendientes": r["pct_pendientes"],
+                "pct_malas": r["pct_malas"],
                 "malos": malos_por_objeto.get(oid, []),
-
             }
         )
-        contexto = {
-            "resumen_sector": resumen_sector,
-            "resumen_ubic":resumen_ubic,
-            "resumen_objetos":resumen_objetos,
-        }
+
+    # -------------------------------------------------
+    # DATOS PARA LOS COMBOS DE FILTRO
+    # -------------------------------------------------
+    sectores = Sector.objects.all().order_by("sector")
+
+    ubicaciones = Ubicacion.objects.select_related("sector").all().order_by(
+        "ubicacion"
+    )
+
+    pisos = (
+        Piso.objects.select_related("ubicacion")
+        .all()
+        .order_by("ubicacion__ubicacion", "piso")
+    )
+
+    tipos_lugar = TipoLugar.objects.all().order_by("tipo_de_lugar")
+
+    categorias = CategoriaObjeto.objects.all().order_by("nombre_de_categoria")
+
+    objetos_catalogo = (
+        Objeto.objects.select_related("objeto_categoria")
+        .all()
+        .order_by("objeto_categoria__nombre_de_categoria", "nombre_del_objeto")
+    )
+
+    tipos_obj = (
+        TipoObjeto.objects.select_related("objeto")
+        .all()
+        .order_by("objeto__nombre_del_objeto", "marca", "material")
+    )
+
+    estados = ObjetoLugar.ESTADO  # tus choices de estado
+
+    contexto = {
+        "resumen_sector": resumen_sector,
+        "resumen_ubic": resumen_ubic,
+        "resumen_objetos": resumen_objetos,
+        # combos
+        "sectores": sectores,
+        "ubicaciones": ubicaciones,
+        "pisos": pisos,
+        "tipos_lugar": tipos_lugar,
+        "categorias": categorias,
+        "objetos_catalogo": objetos_catalogo,
+        "tipos_objeto": tipos_obj,
+        "estados": estados,
+        # valores seleccionados
+        "sector_actual": sector_id,
+        "ubicacion_actual": ubicacion_id,
+        "piso_actual": piso_id,
+        "tipo_lugar_actual": tipo_lugar_id,
+        "categoria_actual": categoria_id,
+        "objeto_actual": objeto_id,
+        "tipo_objeto_actual": tipo_objeto_id,
+        "estado_actual": estado_val,
+    }
+
     return render(request, "resumen/resumen_general.html", contexto)

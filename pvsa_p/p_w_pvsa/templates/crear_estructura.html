@@ -1,117 +1,441 @@
-{# templates/crear_estructura.html #}
 {% extends "base.html" %}
+
 {% block content %}
-<div class="container py-4" style="max-width: 1100px;">
-
-  <div class="mb-4">
-    <h2 class="mb-1">Carga completa</h2>
-    <p class="text-muted mb-0">
-      Crea sector, ubicación, piso y lugar, y agrega los objetos del lugar en una sola pantalla.
+<div class="container mt-4">
+    <h3>Carga completa</h3>
+    <p class="text-muted">
+        Selecciona datos existentes o crea nuevos, y agrega los objetos del lugar en una sola operación.
     </p>
-  </div>
 
-  <form method="post" class="card shadow-sm border-0">
-    {% csrf_token %}
-    <div class="card-body p-4">
+    <form method="post" novalidate>
+        {% csrf_token %}
 
-      {% if base_form.non_field_errors %}
-        <div class="alert alert-danger">
-          {{ base_form.non_field_errors }}
+        <!-- ================= DATOS BASE ================= -->
+        <div class="card mb-3">
+            <div class="card-header">Datos base</div>
+            <div class="card-body">
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger py-1">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <!-- Sector -->
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">{{ form.sector_existente.label }}</label>
+                        {{ form.sector_existente }}
+                        {{ form.sector_existente.errors }}
+                        <small class="text-muted d-block">
+                            Elige un sector que ya exista.
+                        </small>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">{{ form.sector_nuevo.label }}</label>
+                        {{ form.sector_nuevo }}
+                        {{ form.sector_nuevo.errors }}
+                        <small class="text-muted d-block">
+                            O escribe un nuevo sector.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Ubicación -->
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">{{ form.ubicacion_existente.label }}</label>
+                        {{ form.ubicacion_existente }}
+                        {{ form.ubicacion_existente.errors }}
+                        <small class="text-muted d-block">
+                            Elige una ubicación ya creada (ligada al sector).
+                        </small>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">{{ form.ubicacion_nueva.label }}</label>
+                        {{ form.ubicacion_nueva }}
+                        {{ form.ubicacion_nueva.errors }}
+                        <small class="text-muted d-block">
+                            O escribe una nueva ubicación.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Piso -->
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">{{ form.piso_existente.label }}</label>
+                        {{ form.piso_existente }}
+                        {{ form.piso_existente.errors }}
+                        <small class="text-muted d-block">
+                            Elige un piso ya registrado para esa ubicación.
+                        </small>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">{{ form.piso_nuevo.label }}</label>
+                        {{ form.piso_nuevo }}
+                        {{ form.piso_nuevo.errors }}
+                        <small class="text-muted d-block">
+                            O indica un nuevo número de piso.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Tipo de lugar -->
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">{{ form.tipo_lugar_existente.label }}</label>
+                        {{ form.tipo_lugar_existente }}
+                        {{ form.tipo_lugar_existente.errors }}
+                        <small class="text-muted d-block">
+                            Elige un tipo de lugar ya existente.
+                        </small>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">{{ form.tipo_lugar_nuevo.label }}</label>
+                        {{ form.tipo_lugar_nuevo }}
+                        {{ form.tipo_lugar_nuevo.errors }}
+                        <small class="text-muted d-block">
+                            O escribe un nuevo tipo de lugar.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Nombre del lugar -->
+                <div class="mb-2">
+                    <label class="form-label">{{ form.nombre_del_lugar.label }}</label>
+                    {{ form.nombre_del_lugar }}
+                    {{ form.nombre_del_lugar.errors }}
+                    <small class="text-muted d-block">
+                        Nombre exacto del lugar (siempre se escribe a mano).
+                    </small>
+                </div>
+            </div>
         </div>
-      {% endif %}
 
-      <h5 class="mb-3">Datos base</h5>
-      <div class="row g-3 mb-4">
-        <div class="col-md-4">
-          {{ base_form.sector.label_tag }}{{ base_form.sector }}
+        <!-- ================= OBJETOS DEL LUGAR ================= -->
+        <div class="card mb-3">
+            <div class="card-header">Objetos del lugar</div>
+            <div class="card-body">
+
+                <p class="small text-muted mb-3">
+                    En cada bloque sigue estos pasos:
+                    <br>1) Elige o crea la <strong>categoría</strong>.
+                    <br>2) Elige o crea el <strong>objeto</strong> dentro de esa categoría.
+                    <br>3) Elige un <strong>tipo de objeto</strong> existente (marca + material),
+                    o crea uno nuevo escribiendo marca y material.
+                    <br>4) Indica <strong>cantidad</strong>, <strong>estado</strong> y <strong>detalle</strong> para este lugar.
+                    <br><br>
+                    Si no necesitas un bloque, puedes dejarlo completamente en blanco.
+                </p>
+
+                {{ objetos_formset.management_form }}
+
+                <div id="objetos-container">
+                    {% for f in objetos_formset %}
+                        <div class="border rounded p-3 mb-3 objeto-form">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0 objeto-title">Objeto {{ forloop.counter }}</h6>
+                                <button type="button" class="btn btn-outline-danger btn-sm remove-obj-btn">
+                                    Quitar
+                                </button>
+                            </div>
+
+                            {# Paso 1: Categoría #}
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small d-block">
+                                    1. Categoría
+                                </label>
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <small class="text-muted d-block mb-1">
+                                            Categoría existente
+                                        </small>
+                                        {{ f.categoria_existente }}
+                                        {{ f.categoria_existente.errors }}
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <small class="text-muted d-block mb-1">
+                                            O escribe una nueva categoría
+                                        </small>
+                                        {{ f.categoria_nueva }}
+                                        {{ f.categoria_nueva.errors }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {# Paso 2: Objeto #}
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small d-block">
+                                    2. Objeto
+                                </label>
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <small class="text-muted d-block mb-1">
+                                            Objeto existente (ligado a la categoría)
+                                        </small>
+                                        {{ f.objeto_existente }}
+                                        {{ f.objeto_existente.errors }}
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <small class="text-muted d-block mb-1">
+                                            O escribe el nombre del nuevo objeto
+                                        </small>
+                                        {{ f.objeto_nuevo }}
+                                        {{ f.objeto_nuevo.errors }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {# Paso 3: Tipo de objeto #}
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small d-block">
+                                    3. Tipo de objeto
+                                </label>
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <small class="text-muted d-block mb-1">
+                                            Tipo de objeto existente (marca + material)
+                                        </small>
+                                        {{ f.tipo_objeto_existente }}
+                                        {{ f.tipo_objeto_existente.errors }}
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <small class="text-muted d-block mb-1">
+                                            O crea un nuevo tipo de objeto para este objeto
+                                        </small>
+                                        <div class="row">
+                                            <div class="col-sm-6 mb-2">
+                                                <span class="small d-block mb-1">Marca</span>
+                                                {{ f.marca }}
+                                                {{ f.marca.errors }}
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <span class="small d-block mb-1">Material</span>
+                                                {{ f.material }}
+                                                {{ f.material.errors }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {# Paso 4: Datos en este lugar #}
+                            <div class="mb-1">
+                                <label class="form-label fw-semibold small d-block">
+                                    4. Datos en este lugar
+                                </label>
+                                <div class="row">
+                                    <div class="col-md-3 mb-2">
+                                        <span class="small d-block mb-1">Cantidad</span>
+                                        {{ f.cantidad }}
+                                        {{ f.cantidad.errors }}
+                                    </div>
+                                    <div class="col-md-3 mb-2">
+                                        <span class="small d-block mb-1">Estado</span>
+                                        {{ f.estado }}
+                                        {{ f.estado.errors }}
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <span class="small d-block mb-1">Detalle (opcional)</span>
+                                        {{ f.detalle }}
+                                        {{ f.detalle.errors }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% if f.non_field_errors %}
+                                <div class="alert alert-warning py-1 mt-2 mb-0">
+                                    {{ f.non_field_errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Template oculto para nuevos objetos -->
+                <div id="empty-form" class="d-none">
+                    <div class="border rounded p-3 mb-3 objeto-form">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0 objeto-title">Objeto X</h6>
+                            <button type="button" class="btn btn-outline-danger btn-sm remove-obj-btn">
+                                Quitar
+                            </button>
+                        </div>
+
+                        <!-- Paso 1: Categoría -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small d-block">
+                                1. Categoría
+                            </label>
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <small class="text-muted d-block mb-1">
+                                        Categoría existente
+                                    </small>
+                                    {{ objetos_formset.empty_form.categoria_existente }}
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <small class="text-muted d-block mb-1">
+                                        O escribe una nueva categoría
+                                    </small>
+                                    {{ objetos_formset.empty_form.categoria_nueva }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Paso 2: Objeto -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small d-block">
+                                2. Objeto
+                            </label>
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <small class="text-muted d-block mb-1">
+                                        Objeto existente (ligado a la categoría)
+                                    </small>
+                                    {{ objetos_formset.empty_form.objeto_existente }}
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <small class="text-muted d-block mb-1">
+                                        O escribe el nombre del nuevo objeto
+                                    </small>
+                                    {{ objetos_formset.empty_form.objeto_nuevo }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Paso 3: Tipo de objeto -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small d-block">
+                                3. Tipo de objeto
+                            </label>
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <small class="text-muted d-block mb-1">
+                                        Tipo de objeto existente (marca + material)
+                                    </small>
+                                    {{ objetos_formset.empty_form.tipo_objeto_existente }}
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <small class="text-muted d-block mb-1">
+                                        O crea un nuevo tipo de objeto para este objeto
+                                    </small>
+                                    <div class="row">
+                                        <div class="col-sm-6 mb-2">
+                                            <span class="small d-block mb-1">Marca</span>
+                                            {{ objetos_formset.empty_form.marca }}
+                                        </div>
+                                        <div class="col-sm-6 mb-2">
+                                            <span class="small d-block mb-1">Material</span>
+                                            {{ objetos_formset.empty_form.material }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Paso 4: Datos en este lugar -->
+                        <div class="mb-1">
+                            <label class="form-label fw-semibold small d-block">
+                                4. Datos en este lugar
+                            </label>
+                            <div class="row">
+                                <div class="col-md-3 mb-2">
+                                    <span class="small d-block mb-1">Cantidad</span>
+                                    {{ objetos_formset.empty_form.cantidad }}
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <span class="small d-block mb-1">Estado</span>
+                                    {{ objetos_formset.empty_form.estado }}
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <span class="small d-block mb-1">Detalle (opcional)</span>
+                                    {{ objetos_formset.empty_form.detalle }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="add-obj-btn" class="btn btn-outline-secondary btn-sm" type="button">
+                    + Agregar otro objeto
+                </button>
+
+            </div>
         </div>
-        <div class="col-md-4">
-          {{ base_form.ubicacion.label_tag }}{{ base_form.ubicacion }}
-        </div>
-        <div class="col-md-4">
-          {{ base_form.piso.label_tag }}{{ base_form.piso }}
-        </div>
-        <div class="col-md-6">
-          {{ base_form.nombre_del_lugar.label_tag }}{{ base_form.nombre_del_lugar }}
-        </div>
-        <div class="col-md-3">
-          {{ base_form.tipo_lugar_existente.label_tag }}{{ base_form.tipo_lugar_existente }}
-          <div class="form-text">Selecciona uno ya creado (opcional).</div>
-        </div>
-        <div class="col-md-3">
-          {{ base_form.nuevo_tipo_lugar.label_tag }}{{ base_form.nuevo_tipo_lugar }}
-          <div class="form-text">Si escribes aquí se creará un nuevo tipo.</div>
-        </div>
-      </div>
 
-      <hr class="my-4">
-
-      <h5 class="mb-3">Objetos del lugar</h5>
-      <p class="text-muted small mb-3">
-        Completa solo las filas que necesites. Puedes elegir un tipo de objeto existente
-        o crear nueva categoría / objeto / tipo de objeto.
-      </p>
-
-      {{ objetos_formset.management_form }}
-
-      <div class="table-responsive">
-        <table class="table table-bordered table-sm align-middle">
-          <thead class="table-light">
-            <tr>
-              <th style="min-width: 220px;">Tipo de objeto (existente)</th>
-              <th style="width: 100px;">Cantidad</th>
-              <th style="width: 220px;">Estado</th>
-              <th style="width: 150px;">Detalle</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for f in objetos_formset %}
-              <tr>
-                <td>{{ f.tipo_de_objeto }}</td>
-                <td>{{ f.cantidad }}</td>
-                <td>{{ f.estado }}</td>
-                <td>{{ f.detalle }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <hr class="my-4">
-
-      <h5 class="mb-3">Crear detalles de objeto</h5>
-      <p class="text-muted small mb-3">
-        Completa para el formulario si necesitas crear un nuevo objeto no existente.
-      </p>
-      <div class="table-responsive">
-        <table class="table table-bordered table-sm align-middle">
-          <thead class="table-light">
-            <tr>
-              <th style="min-width: 180px;">Nueva categoría</th>
-              <th style="min-width: 180px;">Nuevo objeto</th>
-              <th style="min-width: 140px;">Marca</th>
-              <th style="min-width: 140px;">Material</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for f in objetos_formset %}
-              <tr>
-                <td>{{ f.nueva_categoria }}</td>
-                <td>{{ f.nuevo_objeto }}</td>
-                <td>{{ f.marca }}</td>
-                <td>{{ f.material }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <div class="d-flex gap-2 mt-3">
-        <button class="btn btn-primary" type="submit">Guardar todo</button>
-        <a class="btn btn-outline-secondary" href="{% url 'home' %}">Cancelar</a>
-      </div>
-
-    </div>
-  </form>
-
+        <button type="submit" class="btn btn-primary">Guardar todo</button>
+    </form>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const addBtn = document.getElementById("add-obj-btn");
+    const container = document.getElementById("objetos-container");
+    const totalFormsInput = document.getElementById("id_obj-TOTAL_FORMS");
+    const emptyFormDiv = document.getElementById("empty-form");
+
+    function renumerarTitulos() {
+        const titulos = container.querySelectorAll(".objeto-title");
+        titulos.forEach(function (titulo, idx) {
+            titulo.textContent = "Objeto " + (idx + 1);
+        });
+    }
+
+    function reindexForms() {
+        const forms = container.querySelectorAll(".objeto-form");
+
+        forms.forEach(function (formElem, index) {
+            const campos = formElem.querySelectorAll("input, select, textarea, label");
+            campos.forEach(function (el) {
+                if (el.name && el.name.indexOf("obj-") === 0) {
+                    el.name = el.name.replace(/obj-(\d+)-/, "obj-" + index + "-");
+                }
+                if (el.id && el.id.indexOf("id_obj-") === 0) {
+                    el.id = el.id.replace(/id_obj-(\d+)-/, "id_obj-" + index + "-");
+                }
+                if (el.htmlFor && el.htmlFor.indexOf("id_obj-") === 0) {
+                    el.htmlFor = el.htmlFor.replace(/id_obj-(\d+)-/, "id_obj-" + index + "-");
+                }
+            });
+        });
+
+        totalFormsInput.value = forms.length;
+        renumerarTitulos();
+    }
+
+    addBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+
+        const currentCount = parseInt(totalFormsInput.value, 10) || 0;
+        const newIndex = currentCount;
+
+        const templateHtml = emptyFormDiv.innerHTML.replace(/__prefix__/g, newIndex);
+        const tempContainer = document.createElement("div");
+        tempContainer.innerHTML = templateHtml.trim();
+
+        const newForm = tempContainer.firstElementChild;
+        container.appendChild(newForm);
+
+        reindexForms();
+    });
+
+    // Botón QUITAR (delegación de eventos)
+    container.addEventListener("click", function (e) {
+        const btn = e.target.closest(".remove-obj-btn");
+        if (!btn) return;
+
+        e.preventDefault();
+        const card = btn.closest(".objeto-form");
+        if (card) {
+            card.remove();
+            reindexForms();
+        }
+    });
+
+    // Inicial: por si hay forms ya renderizados (errores de validación, etc.)
+    reindexForms();
+});
+</script>
 {% endblock %}

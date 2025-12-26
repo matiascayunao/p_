@@ -188,93 +188,233 @@ class EditarHistorico(ModelForm):
         ]
 
 
-# -------------------
-# FORMULARIO ÚNICO DE ESTRUCTURA
-# -------------------
+# ============================
+# FORMULARIO BASE DE ESTRUCTURA
+# ============================
 
-
-class BaseEstructuraForm(forms.Form):
-    sector = forms.CharField(max_length=100, label="Sector")
-    ubicacion = forms.CharField(max_length=100, label="Ubicación")
-    piso = forms.IntegerField(label="Piso", min_value=0)
-    nombre_del_lugar = forms.CharField(max_length=100, label="Nombre del lugar")
-
-    tipo_lugar_existente = forms.ModelChoiceField(
-        label="Tipo de lugar (existente)",
-        queryset=TipoLugar.objects.all(),
+class EstructuraCompletaForm(forms.Form):
+    # --- Sector ---
+    sector_existente = forms.ModelChoiceField(
+        label="Sector (existente)",
+        queryset=Sector.objects.all().order_by("sector"),
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
-    nuevo_tipo_lugar = forms.CharField(
+    sector_nuevo = forms.CharField(
+        label="Nuevo sector",
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+
+    # --- Ubicación ---
+    ubicacion_existente = forms.ModelChoiceField(
+        label="Ubicación (existente)",
+        queryset=Ubicacion.objects.select_related("sector")
+        .all()
+        .order_by("sector__sector", "ubicacion"),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    ubicacion_nueva = forms.CharField(
+        label="Nueva ubicación",
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+
+    # --- Piso ---
+    piso_existente = forms.ModelChoiceField(
+        label="Piso (existente)",
+        queryset=Piso.objects.select_related("ubicacion")
+        .all()
+        .order_by("ubicacion__ubicacion", "piso"),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    piso_nuevo = forms.IntegerField(
+        label="Nuevo piso",
+        required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control"}),
+    )
+
+    # --- Tipo de lugar ---
+    tipo_lugar_existente = forms.ModelChoiceField(
+        label="Tipo de lugar (existente)",
+        queryset=TipoLugar.objects.all().order_by("tipo_de_lugar"),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    tipo_lugar_nuevo = forms.CharField(
         label="Nuevo tipo de lugar",
         max_length=100,
         required=False,
         widget=forms.TextInput(attrs={"class": "form-control"}),
     )
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        for field in self.fields.values():
-            if isinstance(field.widget, forms.Select):
-                field.widget.attrs.setdefault("class", "form-select")
-            else:
-                field.widget.attrs.setdefault("class", "form-control")
+    # --- Nombre del lugar (siempre a mano) ---
+    nombre_del_lugar = forms.CharField(
+        label="Nombre del lugar",
+        max_length=100,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
 
     def clean(self):
         cleaned = super().clean()
-        existente = cleaned.get("tipo_lugar_existente")
-        nuevo = (cleaned.get("nuevo_tipo_lugar") or "").strip()
 
-        if not existente and not nuevo:
+        # Sector: existente o nuevo
+        if not cleaned.get("sector_existente") and not (cleaned.get("sector_nuevo") or "").strip():
+            raise forms.ValidationError(
+                "Debes seleccionar un sector existente o escribir uno nuevo."
+            )
+
+        # Ubicación: existente o nueva
+        if not cleaned.get("ubicacion_existente") and not (cleaned.get("ubicacion_nueva") or "").strip():
+            raise forms.ValidationError(
+                "Debes seleccionar una ubicación existente o escribir una nueva."
+            )
+
+        # Piso: existente o nuevo
+        if not cleaned.get("piso_existente") and cleaned.get("piso_nuevo") in (None, ""):
+            raise forms.ValidationError(
+                "Debes seleccionar un piso existente o escribir uno nuevo."
+            )
+
+        # Tipo de lugar: existente o nuevo
+        if not cleaned.get("tipo_lugar_existente") and not (cleaned.get("tipo_lugar_nuevo") or "").strip():
             raise forms.ValidationError(
                 "Debes seleccionar un tipo de lugar existente o escribir uno nuevo."
             )
 
-        cleaned["nuevo_tipo_lugar"] = nuevo
         return cleaned
 
 
+# ============================
+# FORMULARIO DE FILA DE OBJETO
+# ============================
+
 class ObjetoLugarFilaForm(forms.Form):
-    tipo_de_objeto = forms.ModelChoiceField(
-        label="Tipo de objeto",
+    # --- Categoría ---
+    categoria_existente = forms.ModelChoiceField(
+        label="Categoría (existente)",
+        queryset=CategoriaObjeto.objects.all().order_by("nombre_de_categoria"),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
+    )
+    categoria_nueva = forms.CharField(
+        label="Nueva categoría",
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+    )
+
+    # --- Objeto ---
+    objeto_existente = forms.ModelChoiceField(
+        label="Objeto (existente)",
+        queryset=Objeto.objects.select_related("objeto_categoria")
+        .all()
+        .order_by("objeto_categoria__nombre_de_categoria", "nombre_del_objeto"),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
+    )
+    objeto_nuevo = forms.CharField(
+        label="Nuevo objeto",
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+    )
+
+    # --- Tipo de objeto ---
+    tipo_objeto_existente = forms.ModelChoiceField(
+        label="Tipo de objeto (existente)",
         queryset=TipoObjeto.objects.select_related("objeto")
         .all()
         .order_by("objeto__nombre_del_objeto", "marca", "material"),
+        required=False,
         widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
     )
+    marca = forms.CharField(
+        label="Marca",
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+    )
+    material = forms.CharField(
+        label="Material",
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+    )
 
+    # --- Datos del objeto en el lugar ---
     cantidad = forms.IntegerField(
-        label="Cant.",
-        min_value=0,
+        label="Cantidad",
+        min_value=1,
+        required=False,
         widget=forms.NumberInput(
-            attrs={
-                "class": "form-control form-control-sm",
-                "style": "width: 80px;",
-            }
+            attrs={"class": "form-control form-control-sm", "style": "width: 80px;"}
         ),
     )
-
     estado = forms.ChoiceField(
         label="Estado",
-        choices=ObjetoLugar.ESTADO,  # <-- SIN .items()
+        required=False,
+        choices=ObjetoLugar.ESTADO,
         widget=forms.Select(attrs={"class": "form-select form-select-sm"}),
     )
-
     detalle = forms.CharField(
         label="Detalle",
         required=False,
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control form-control-sm",
-                "placeholder": "Detalle (opcional)",
-            }
-        ),
+        widget=forms.TextInput(attrs={"class": "form-control form-control-sm"}),
     )
+
+    def clean(self):
+        cleaned = super().clean()
+
+        # ¿Fila completamente vacía? -> la marcamos y la vista la ignora
+        fields_to_check = [
+            "categoria_existente", "categoria_nueva",
+            "objeto_existente", "objeto_nuevo",
+            "tipo_objeto_existente", "marca", "material",
+            "cantidad", "estado", "detalle",
+        ]
+        if not any(cleaned.get(f) not in (None, "", 0) for f in fields_to_check):
+            cleaned["__empty__"] = True
+            return cleaned
+
+        # A partir de aquí, la fila se considera "usada", así que validamos:
+
+        # Categoría: existente o nueva
+        if not cleaned.get("categoria_existente") and not (cleaned.get("categoria_nueva") or "").strip():
+            raise forms.ValidationError(
+                "En cada fila usa una categoría existente o escribe una nueva."
+            )
+
+        # Objeto: existente o nuevo
+        if not cleaned.get("objeto_existente") and not (cleaned.get("objeto_nuevo") or "").strip():
+            raise forms.ValidationError(
+                "En cada fila usa un objeto existente o escribe uno nuevo."
+            )
+
+        # Tipo de objeto: existente, o marca/material
+        tiene_tipo = cleaned.get("tipo_objeto_existente")
+        tiene_marca_o_material = (cleaned.get("marca") or "").strip() or (cleaned.get("material") or "").strip()
+        if not tiene_tipo and not tiene_marca_o_material:
+            raise forms.ValidationError(
+                "En cada fila selecciona un tipo de objeto existente o escribe marca/material."
+            )
+
+        # Cantidad y estado obligatorios si la fila se usa
+        if cleaned.get("cantidad") in (None, ""):
+            raise forms.ValidationError("En cada fila usada debes indicar la cantidad.")
+        if not cleaned.get("estado"):
+            raise forms.ValidationError("En cada fila usada debes indicar el estado.")
+
+        cleaned["__empty__"] = False
+        return cleaned
 
 
 ObjetoLugarFilaFormSet = formset_factory(
     ObjetoLugarFilaForm,
-    extra=2,
+    extra=1,
     can_delete=False,
 )

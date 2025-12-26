@@ -3,173 +3,201 @@
 
 <div class="container py-5">
 
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-body p-4">
-      <h2 class="mb-1">Home</h2>
-      <p class="text-muted mb-0">Accesos rápidos del sistema.</p>
-    </div>
+  <!-- Encabezado -->
+  <div class="mb-4">
+    <h1 class="h3 mb-1">Panel principal</h1>
+    <p class="text-muted mb-0">
+      Desde aquí puedes acceder rápidamente a la carga de datos, reportes
+      y a cada módulo del sistema.
+    </p>
   </div>
 
-  <div class="row g-3">
+  <div class="row g-4">
 
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
+    <!-- Columna izquierda: atajos principales -->
+    <div class="col-12 col-lg-5">
+
+      <!-- Carga / Formularios -->
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white border-0">
+          <h5 class="mb-0">Operaciones rápidas</h5>
+        </div>
         <div class="card-body">
-          <h5 class="card-title mb-2 ">Formulario</h5>
-          <div class="d-grid gap-2 pt-2">
-            <a href="{% url 'crear_estructura' %}" class="btn btn-success">
-              Carga completa 
+
+          <div class="mb-3">
+            <h6 class="text-muted text-uppercase small mb-1">Formulario unificado</h6>
+            <p class="small text-muted mb-2">
+              Crea sector, ubicación, piso, lugar y objetos en una sola pantalla.
+            </p>
+            <a href="{% url 'crear_estructura' %}" class="btn btn-success w-100">
+              Carga completa
             </a>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
-        <div class="card-body">
-          <h5 class="card-title mb-2 ">Formulario</h5>
-          <div class="d-grid gap-2 pt-2">
-            <a href="{% url 'descargar_excel_sectores' %}" class="btn btn-success">
-              boton excel
+          <hr>
+
+          <div class="mb-3">
+            <h6 class="text-muted text-uppercase small mb-1">Exportar estructura</h6>
+            <p class="small text-muted mb-2">
+              Descarga un archivo Excel con la información de sectores,
+              ubicaciones, pisos y lugares.
+            </p>
+            <a href="{% url 'descargar_excel_sectores' %}" class="btn btn-outline-success w-100">
+              Descargar Excel
             </a>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
-        <div class="card-body">
-          <h5 class="card-title mb-2 ">Resumen</h5>
-          <div class="d-grid gap-2 pt-2">
-            <a href="{% url 'resumen_general' %}" class="btn btn-success">
-              resumen
+          <hr>
+
+          <div>
+            <h6 class="text-muted text-uppercase small mb-1">Reportes</h6>
+            <p class="small text-muted mb-2">
+              Visualiza estadísticas de estado por sector, ubicación y objeto.
+            </p>
+            <a href="{% url 'resumen_general' %}" class="btn btn-outline-primary w-100">
+              Ver resumen general
             </a>
           </div>
+
         </div>
       </div>
+
     </div>
 
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
+    <!-- Columna derecha: módulos -->
+    <div class="col-12 col-lg-7">
+
+      <!-- Bloque Estructura -->
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Estructura del puerto</h5>
+          <span class="badge bg-light text-muted fw-normal">Sectores · Ubicaciones · Pisos · Lugares · Tipos de lugar</span>
+        </div>
         <div class="card-body">
-          <h5 class="card-title mb-2 text-uppercase">Sector</h5>
-          <div class="d-grid gap-2">
-            <a href="{% url 'lista_sectores' %}" class="btn btn-outline-primary">Ver</a>
-            <a href="{% url 'crear_sector' %}" class="btn btn-outline-secondary">Crear</a>
+          <div class="row g-3">
+
+            <div class="col-12 col-md-6">
+              <h6 class="text-uppercase small mb-2">Sector</h6>
+              <div class="d-grid gap-2">
+                <a href="{% url 'lista_sectores' %}" class="btn btn-outline-primary btn-sm">Ver sectores</a>
+                <a href="{% url 'crear_sector' %}" class="btn btn-outline-secondary btn-sm">Crear sector</a>
+              </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <h6 class="text-uppercase small mb-2">Ubicación</h6>
+              <div class="d-grid gap-2">
+                <a href="{% url 'lista_ubicaciones' %}" class="btn btn-outline-primary btn-sm">Ver ubicaciones</a>
+                <a href="/ubicacion/crear/" class="btn btn-outline-secondary btn-sm">Crear ubicación</a>
+              </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <h6 class="text-uppercase small mb-2">Piso</h6>
+              <div class="d-grid gap-2">
+                <a href="/pisos/" class="btn btn-outline-primary btn-sm">Ver pisos</a>
+                <a href="/piso/crear/" class="btn btn-outline-secondary btn-sm">Crear piso</a>
+              </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <h6 class="text-uppercase small mb-2">Lugar</h6>
+              <div class="d-grid gap-2">
+                <a href="/lugares/" class="btn btn-outline-primary btn-sm">Ver lugares</a>
+                <a href="/lugar/crear/" class="btn btn-outline-secondary btn-sm">Crear lugar</a>
+              </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <h6 class="text-uppercase small mb-2">Tipo de lugar</h6>
+              <div class="d-grid gap-2">
+                <a href="/tipo-lugar/" class="btn btn-outline-primary btn-sm">Ver tipos de lugar</a>
+                <a href="/tipo-lugar/crear/" class="btn btn-outline-secondary btn-sm">Crear tipo de lugar</a>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
+      <!-- Bloque Catálogo de objetos -->
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Catálogo de objetos</h5>
+          <span class="badge bg-light text-muted fw-normal">Categorías · Objetos · Tipos de objeto</span>
+        </div>
         <div class="card-body">
-          <h5 class="card-title mb-2 text-uppercase">Ubicacion</h5>
-          <div class="d-grid gap-2">
-            <a href="{% url 'lista_ubicaciones' %}" class="btn btn-outline-primary">Ver</a>
-            <a href="/ubicacion/crear/" class="btn btn-outline-secondary">Crear</a>
+          <div class="row g-3">
+
+            <div class="col-12 col-md-4">
+              <h6 class="text-uppercase small mb-2">Categoría</h6>
+              <div class="d-grid gap-2">
+                <a href="/categorias/" class="btn btn-outline-primary btn-sm">Ver categorías</a>
+                <a href="/categoria/crear/" class="btn btn-outline-secondary btn-sm">Crear categoría</a>
+              </div>
+            </div>
+
+            <div class="col-12 col-md-4">
+              <h6 class="text-uppercase small mb-2">Objeto</h6>
+              <div class="d-grid gap-2">
+                <a href="/objetos/" class="btn btn-outline-primary btn-sm">Ver objetos</a>
+                <a href="/objeto/crear/" class="btn btn-outline-secondary btn-sm">Crear objeto</a>
+              </div>
+            </div>
+
+            <div class="col-12 col-md-4">
+              <h6 class="text-uppercase small mb-2">Tipo de objeto</h6>
+              <div class="d-grid gap-2">
+                <a href="/tipos-objeto/" class="btn btn-outline-primary btn-sm">Ver tipos de objeto</a>
+                <a href="/tipo-objeto/crear/" class="btn btn-outline-secondary btn-sm">Crear tipo de objeto</a>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
+      <!-- Bloque Movimientos / Histórico -->
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Objetos en los lugares</h5>
+          <span class="badge bg-light text-muted fw-normal">Inventario · Historial de cambios</span>
+        </div>
         <div class="card-body">
-          <h5 class="card-title mb-2 text-uppercase">Piso</h5>
-          <div class="d-grid gap-2">
-            <a href="/pisos/" class="btn btn-outline-primary">Ver</a>
-            <a href="/piso/crear/" class="btn btn-outline-secondary">Crear</a>
+          <div class="row g-3">
+
+            <div class="col-12 col-md-6">
+              <h6 class="text-uppercase small mb-2">Objeto del lugar</h6>
+              <p class="small text-muted mb-2">
+                Detalle de los objetos asignados a cada lugar.
+              </p>
+              <div class="d-grid">
+                <a href="/objetos-lugar/" class="btn btn-outline-primary btn-sm">
+                  Ver objetos del lugar
+                </a>
+              </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <h6 class="text-uppercase small mb-2">Histórico</h6>
+              <p class="small text-muted mb-2">
+                Cambios de cantidad, estado y detalle registrados en el tiempo.
+              </p>
+              <div class="d-grid">
+                <a href="/historico/" class="btn btn-outline-primary btn-sm">
+                  Ver históricos
+                </a>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
-        <div class="card-body">
-          <h5 class="card-title mb-2 text-uppercase">Lugar</h5>
-          <div class="d-grid gap-2">
-            <a href="/lugares/" class="btn btn-outline-primary">Ver</a>
-            <a href="/lugar/crear/" class="btn btn-outline-secondary">Crear</a>
-          </div>
-        </div>
-      </div>
-    </div>
+    </div> <!-- /col derecha -->
 
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
-        <div class="card-body">
-          <h5 class="card-title mb-2 text-uppercase">Tipo de lugar</h5>
-          <div class="d-grid gap-2">
-            <a href="/tipo-lugar/" class="btn btn-outline-primary">Ver</a>
-            <a href="/tipo-lugar/crear/" class="btn btn-outline-secondary">Crear</a>
-          </div>
-        </div>
-      </div>
-    </div>
+  </div> <!-- /row -->
 
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
-        <div class="card-body">
-          <h5 class="card-title mb-2 text-uppercase">Categoria del objeto</h5>
-          <div class="d-grid gap-2">
-            <a href="/categorias/" class="btn btn-outline-primary">Ver</a>
-            <a href="/categoria/crear/" class="btn btn-outline-secondary">Crear</a>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
-        <div class="card-body">
-          <h5 class="card-title mb-2 text-uppercase">Objeto</h5>
-          <div class="d-grid gap-2">
-            <a href="/objetos/" class="btn btn-outline-primary">Ver</a>
-            <a href="/objeto/crear/" class="btn btn-outline-secondary">Crear</a>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
-        <div class="card-body">
-          <h5 class="card-title mb-2 text-uppercase">Tipo de objeto</h5>
-          <div class="d-grid gap-2">
-            <a href="/tipos-objeto/" class="btn btn-outline-primary">Ver</a>
-            <a href="/tipo-objeto/crear/" class="btn btn-outline-secondary">Crear</a>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
-        <div class="card-body">
-          <h5 class="card-title mb-2 text-uppercase">Objeto del lugar</h5>
-          <div class="d-grid gap-2">
-            <a href="/objetos-lugar/" class="btn btn-outline-primary">Ver</a>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-md-6 col-lg-4">
-      <div class="card h-100 shadow-sm border-0">
-        <div class="card-body">
-          <h5 class="card-title mb-2 text-uppercase">Historico</h5>
-          <div class="d-grid gap-2">
-            <a href="/historico/" class="btn btn-outline-primary">Ver</a>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div>
 </div>
 
 {% endblock %}
