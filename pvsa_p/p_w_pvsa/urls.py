@@ -87,4 +87,11 @@ urlpatterns = [
 
     # RESUMEN
     path("resumen/", views.resumen_general, name="resumen_general"),
+
+    path("ajax/ubicaciones-por-sector/",views.ajax_ubicaciones_por_sector,name="ajax_ubicaciones_por_sector",),
+    path("ajax/pisos-por-ubicacion/",views.ajax_pisos_por_ubicacion,name="ajax_pisos_por_ubicacion",),
+    path("ajax/lugares-por-piso/",views.ajax_lugares_por_piso,name="ajax_lugares_por_piso",),
+    path("ajax/objetos-por-categoria/",views.ajax_objetos_por_categoria,name="ajax_objetos_por_categoria",),
+    path("ajax/tipos-por-objeto/",views.ajax_tipos_por_objeto,name="ajax_tipos_por_objeto",),
+
 ]

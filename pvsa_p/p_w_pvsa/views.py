@@ -5,7 +5,7 @@ from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from .excel_utils import build_excel_sectores
 from django.db.models import Sum, Q
 
@@ -1378,9 +1378,7 @@ def _add_percentages(rows):
         m = r.get("malas") or 0
 
         if total == 0:
-            r["pct_buenas"] = 0
-            r["pct_pendientes"] = 0
-            r["pct_malas"] = 0
+            r["pct_buenas"] = r["pct_pendientes"] = r["pct_malas"] = 0
         else:
             r["pct_buenas"] = round(b * 100 / total, 1)
             r["pct_pendientes"] = round(p * 100 / total, 1)
@@ -1389,17 +1387,23 @@ def _add_percentages(rows):
 
 
 def resumen_general(request):
-    # -------- filtros GET --------
-    sector_id = request.GET.get("sector", "").strip()
-    ubicacion_id = request.GET.get("ubicacion", "").strip()
-    piso_id = request.GET.get("piso", "").strip()
-    tipo_lugar_id = request.GET.get("tipo_lugar", "").strip()
-    categoria_id = request.GET.get("categoria", "").strip()
-    objeto_id = request.GET.get("objeto", "").strip()
-    tipo_objeto_id = request.GET.get("tipo_objeto", "").strip()
-    estado_val = request.GET.get("estado", "").strip()
+    # ----------------------
+    # 1) Leer filtros del GET
+    # ----------------------
+    sector_id = request.GET.get("sector") or None
+    ubicacion_id = request.GET.get("ubicacion") or None
+    piso_id = request.GET.get("piso") or None
+    tipo_lugar_id = request.GET.get("tipo_lugar") or None
+    categoria_id = request.GET.get("categoria") or None
+    objeto_id = request.GET.get("objeto") or None
+    tipo_objeto_id = request.GET.get("tipo_objeto") or None
+    estado = request.GET.get("estado") or None
+    marca = request.GET.get("marca") or None
+    material = request.GET.get("material") or None
 
-    # queryset base de ObjetoLugar (con todos los select_related necesarios)
+    # ----------------------
+    # 2) Base de datos filtrada
+    # ----------------------
     base_qs = ObjetoLugar.objects.select_related(
         "lugar",
         "lugar__piso",
@@ -1409,59 +1413,34 @@ def resumen_general(request):
         "tipo_de_objeto",
         "tipo_de_objeto__objeto",
         "tipo_de_objeto__objeto__objeto_categoria",
-    ).all()
+    )
 
-    # -------- aplicar filtros al queryset base --------
     if sector_id:
-        try:
-            base_qs = base_qs.filter(lugar__piso__ubicacion__sector_id=int(sector_id))
-        except ValueError:
-            sector_id = ""
-
+        base_qs = base_qs.filter(lugar__piso__ubicacion__sector_id=sector_id)
     if ubicacion_id:
-        try:
-            base_qs = base_qs.filter(lugar__piso__ubicacion_id=int(ubicacion_id))
-        except ValueError:
-            ubicacion_id = ""
-
+        base_qs = base_qs.filter(lugar__piso__ubicacion_id=ubicacion_id)
     if piso_id:
-        try:
-            base_qs = base_qs.filter(lugar__piso_id=int(piso_id))
-        except ValueError:
-            piso_id = ""
-
+        base_qs = base_qs.filter(lugar__piso_id=piso_id)
     if tipo_lugar_id:
-        try:
-            base_qs = base_qs.filter(lugar__tipo_de_lugar_id=int(tipo_lugar_id))
-        except ValueError:
-            tipo_lugar_id = ""
-
+        base_qs = base_qs.filter(lugar__lugar_tipo_lugar_id=tipo_lugar_id)
     if categoria_id:
-        try:
-            base_qs = base_qs.filter(
-                tipo_de_objeto__objeto__objeto_categoria_id=int(categoria_id)
-            )
-        except ValueError:
-            categoria_id = ""
-
+        base_qs = base_qs.filter(
+            tipo_de_objeto__objeto__objeto_categoria_id=categoria_id
+        )
     if objeto_id:
-        try:
-            base_qs = base_qs.filter(tipo_de_objeto__objeto_id=int(objeto_id))
-        except ValueError:
-            objeto_id = ""
-
+        base_qs = base_qs.filter(tipo_de_objeto__objeto_id=objeto_id)
     if tipo_objeto_id:
-        try:
-            base_qs = base_qs.filter(tipo_de_objeto_id=int(tipo_objeto_id))
-        except ValueError:
-            tipo_objeto_id = ""
+        base_qs = base_qs.filter(tipo_de_objeto_id=tipo_objeto_id)
+    if estado:
+        base_qs = base_qs.filter(estado=estado)
+    if marca:
+        base_qs = base_qs.filter(tipo_de_objeto__marca=marca)
+    if material:
+        base_qs = base_qs.filter(tipo_de_objeto__material=material)
 
-    if estado_val:
-        base_qs = base_qs.filter(estado=estado_val)
-
-    # -------------------------------------------------
-    # RESUMEN POR SECTOR
-    # -------------------------------------------------
+    # ----------------------
+    # 3) Resumen por sector
+    # ----------------------
     qs_sector = (
         base_qs.values(
             "lugar__piso__ubicacion__sector__id",
@@ -1478,9 +1457,9 @@ def resumen_general(request):
     resumen_sector = list(qs_sector)
     _add_percentages(resumen_sector)
 
-    # -------------------------------------------------
-    # RESUMEN POR UBICACIÓN
-    # -------------------------------------------------
+    # ----------------------
+    # 4) Resumen por ubicación
+    # ----------------------
     qs_ubic = (
         base_qs.values(
             "lugar__piso__ubicacion__id",
@@ -1501,9 +1480,9 @@ def resumen_general(request):
     resumen_ubic = list(qs_ubic)
     _add_percentages(resumen_ubic)
 
-    # -------------------------------------------------
-    # RESUMEN POR OBJETO
-    # -------------------------------------------------
+    # ----------------------
+    # 5) Resumen por objeto (objeto, no tipo)
+    # ----------------------
     qs_obj = (
         base_qs.values(
             "tipo_de_objeto__objeto__id",
@@ -1520,7 +1499,7 @@ def resumen_general(request):
     resumen_obj = list(qs_obj)
     _add_percentages(resumen_obj)
 
-    # lugares donde el objeto está en estado Malo (considerando también los filtros)
+    # Objetos en estado malo, para el detalle por objeto
     malos_qs = (
         base_qs.filter(estado="M")
         .select_related(
@@ -1562,38 +1541,38 @@ def resumen_general(request):
             }
         )
 
-    # -------------------------------------------------
-    # DATOS PARA LOS COMBOS DE FILTRO
-    # -------------------------------------------------
-    sectores = Sector.objects.all().order_by("sector")
-
-    ubicaciones = Ubicacion.objects.select_related("sector").all().order_by(
-        "ubicacion"
+    # ----------------------
+    # 6) Datos para los combos de filtros
+    # ----------------------
+    sectores = Sector.objects.order_by("sector")
+    ubicaciones = Ubicacion.objects.select_related("sector").order_by(
+        "sector__sector", "ubicacion"
+    )
+    pisos = Piso.objects.select_related("ubicacion").order_by(
+        "ubicacion__ubicacion", "piso"
+    )
+    tipos_lugar = TipoLugar.objects.order_by("tipo_de_lugar")
+    categorias = CategoriaObjeto.objects.order_by("nombre_de_categoria")
+    objetos_catalogo = Objeto.objects.select_related("objeto_categoria").order_by(
+        "nombre_del_objeto"
+    )
+    tipos_objeto = TipoObjeto.objects.select_related("objeto").order_by(
+        "objeto__nombre_del_objeto", "marca", "material"
     )
 
-    pisos = (
-        Piso.objects.select_related("ubicacion")
-        .all()
-        .order_by("ubicacion__ubicacion", "piso")
+    # NUEVO: marcas y materiales únicos
+    marcas = (
+        TipoObjeto.objects.order_by("marca")
+        .values_list("marca", flat=True)
+        .distinct()
+    )
+    materiales = (
+        TipoObjeto.objects.order_by("material")
+        .values_list("material", flat=True)
+        .distinct()
     )
 
-    tipos_lugar = TipoLugar.objects.all().order_by("tipo_de_lugar")
-
-    categorias = CategoriaObjeto.objects.all().order_by("nombre_de_categoria")
-
-    objetos_catalogo = (
-        Objeto.objects.select_related("objeto_categoria")
-        .all()
-        .order_by("objeto_categoria__nombre_de_categoria", "nombre_del_objeto")
-    )
-
-    tipos_obj = (
-        TipoObjeto.objects.select_related("objeto")
-        .all()
-        .order_by("objeto__nombre_del_objeto", "marca", "material")
-    )
-
-    estados = ObjetoLugar.ESTADO  # tus choices de estado
+    estados = ObjetoLugar.ESTADO
 
     contexto = {
         "resumen_sector": resumen_sector,
@@ -1606,17 +1585,98 @@ def resumen_general(request):
         "tipos_lugar": tipos_lugar,
         "categorias": categorias,
         "objetos_catalogo": objetos_catalogo,
-        "tipos_objeto": tipos_obj,
+        "tipos_objeto": tipos_objeto,
         "estados": estados,
+        "marcas": marcas,
+        "materiales": materiales,
         # valores seleccionados
-        "sector_actual": sector_id,
-        "ubicacion_actual": ubicacion_id,
-        "piso_actual": piso_id,
-        "tipo_lugar_actual": tipo_lugar_id,
-        "categoria_actual": categoria_id,
-        "objeto_actual": objeto_id,
-        "tipo_objeto_actual": tipo_objeto_id,
-        "estado_actual": estado_val,
+        "sector_actual": sector_id or "",
+        "ubicacion_actual": ubicacion_id or "",
+        "piso_actual": piso_id or "",
+        "tipo_lugar_actual": tipo_lugar_id or "",
+        "categoria_actual": categoria_id or "",
+        "objeto_actual": objeto_id or "",
+        "tipo_objeto_actual": tipo_objeto_id or "",
+        "estado_actual": estado or "",
+        "marca_actual": marca or "",
+        "material_actual": material or "",
     }
 
     return render(request, "resumen/resumen_general.html", contexto)
+
+
+    # -------------------------
+# AJAX: combos dependientes
+# -------------------------
+
+def ajax_ubicaciones_por_sector(request):
+    """
+    Devuelve las ubicaciones ligadas a un sector (para el combo de Ubicación).
+    GET: ?sector_id=<id>
+    """
+    sector_id = request.GET.get("sector_id")
+    from .models import Ubicacion  # import local para no romper nada
+
+    qs = Ubicacion.objects.filter(sector_id=sector_id).order_by("ubicacion")
+    data = [{"id": u.id, "nombre": u.ubicacion} for u in qs]
+    return JsonResponse(data, safe=False)
+
+
+def ajax_pisos_por_ubicacion(request):
+    """
+    Devuelve los pisos ligados a una ubicación (para el combo de Piso).
+    GET: ?ubicacion_id=<id>
+    """
+    ubicacion_id = request.GET.get("ubicacion_id")
+    from .models import Piso
+
+    qs = Piso.objects.filter(ubicacion_id=ubicacion_id).order_by("piso")
+    data = [{"id": p.id, "nombre": f"Piso {p.piso}"} for p in qs]
+    return JsonResponse(data, safe=False)
+
+
+def ajax_lugares_por_piso(request):
+    """
+    (Por si lo necesitas) Devuelve lugares ligados a un piso.
+    GET: ?piso_id=<id>
+    """
+    piso_id = request.GET.get("piso_id")
+    from .models import Lugar
+
+    qs = Lugar.objects.filter(piso_id=piso_id).order_by("nombre_del_lugar")
+    data = [{"id": l.id, "nombre": l.nombre_del_lugar} for l in qs]
+    return JsonResponse(data, safe=False)
+
+
+def ajax_objetos_por_categoria(request):
+    """
+    Devuelve los OBJETOS de una categoría (para el combo de Objeto).
+    GET: ?categoria_id=<id>
+    """
+    categoria_id = request.GET.get("categoria_id")
+    from .models import Objeto
+
+    qs = Objeto.objects.filter(objeto_categoria_id=categoria_id).order_by(
+        "nombre_del_objeto"
+    )
+    data = [{"id": o.id, "nombre": o.nombre_del_objeto} for o in qs]
+    return JsonResponse(data, safe=False)
+
+
+def ajax_tipos_por_objeto(request):
+    """
+    Devuelve los TIPOS de objeto (marca/material) ligados a un objeto.
+    GET: ?objeto_id=<id>
+    """
+    objeto_id = request.GET.get("objeto_id")
+    from .models import TipoObjeto
+
+    qs = TipoObjeto.objects.filter(objeto_id=objeto_id).order_by("marca", "material")
+    data = [
+        {
+            "id": t.id,
+            "nombre": f"{t.marca} {t.material}",
+        }
+        for t in qs
+    ]
+    return JsonResponse(data, safe=False)

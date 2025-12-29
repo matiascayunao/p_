@@ -97,8 +97,8 @@ class TipoObjeto(models.Model):
         verbose_name="objeto",
         on_delete=models.RESTRICT,
     )
-    marca = models.CharField(max_length=100, verbose_name="marca")
-    material = models.CharField(max_length=100, verbose_name="material")
+    marca = models.CharField(max_length=100, verbose_name="marca", unique=True)
+    material = models.CharField(max_length=100, verbose_name="material", unique=True, blank=True)
 
     def __str__(self):
         # Objeto + marca + material, ideal para combos

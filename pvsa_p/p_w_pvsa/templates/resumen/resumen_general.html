@@ -144,6 +144,32 @@
                                 {% endfor %}
                             </select>
                         </div>
+                        <!-- Marca -->
+                        <div>
+                        <label for="id_filtro_marca" class="form-label mb-1">Marca</label>
+                        <select id="id_filtro_marca" name="marca" class="form-select form-select-sm">
+                            <option value="">Todas las marcas</option>
+                            {% for m in marcas %}
+                                <option value="{{ m }}" {% if marca_actual == m %}selected{% endif %}>
+                                {{ m }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        </div>
+
+                        <!-- Material -->
+                        <div>
+                        <label for="id_filtro_material" class="form-label mb-1">Material</label>
+                        <select id="id_filtro_material" name="material" class="form-select form-select-sm">
+                            <option value="">Todos los materiales</option>
+                            {% for mat in materiales %}
+                                <option value="{{ mat }}" {% if material_actual == mat %}selected{% endif %}>
+                                {{ mat }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        </div>
+
 
                         <button type="submit" class="btn btn-primary btn-sm mt-2 w-100">
                             Aplicar filtros

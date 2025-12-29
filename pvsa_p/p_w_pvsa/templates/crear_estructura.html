@@ -369,6 +369,7 @@
     </form>
 </div>
 
+{# === TU SCRIPT ORIGINAL: NO LO TOCO === #}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const addBtn = document.getElementById("add-obj-btn");
@@ -438,4 +439,129 @@ document.addEventListener("DOMContentLoaded", function () {
     reindexForms();
 });
 </script>
+
+{# === SCRIPT NUEVO: COMBOS DEPENDIENTES SIN ROMPER NADA === #}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  // ---------------------------
+  // 1) Sector -> Ubicación -> Piso
+  // ---------------------------
+  const sectorSelect = document.getElementById("id_sector_existente");
+  const ubicacionSelect = document.getElementById("id_ubicacion_existente");
+  const pisoSelect = document.getElementById("id_piso_existente");
+
+  if (sectorSelect && ubicacionSelect && pisoSelect) {
+    sectorSelect.addEventListener("change", function () {
+      const sectorId = this.value || "";
+
+      ubicacionSelect.innerHTML = '<option value="">---------</option>';
+      pisoSelect.innerHTML = '<option value="">---------</option>';
+
+      if (!sectorId) return;
+
+      fetch(`/ajax/ubicaciones-por-sector/?sector_id=${sectorId}`)
+        .then(r => r.json())
+        .then(data => {
+          data.forEach(item => {
+            const opt = document.createElement("option");
+            opt.value = item.id;
+            opt.textContent = item.nombre;
+            ubicacionSelect.appendChild(opt);
+          });
+        })
+        .catch(err => console.error("Error cargando ubicaciones:", err));
+    });
+
+    ubicacionSelect.addEventListener("change", function () {
+      const ubicacionId = this.value || "";
+
+      pisoSelect.innerHTML = '<option value="">---------</option>';
+      if (!ubicacionId) return;
+
+      fetch(`/ajax/pisos-por-ubicacion/?ubicacion_id=${ubicacionId}`)
+        .then(r => r.json())
+        .then(data => {
+          data.forEach(item => {
+            const opt = document.createElement("option");
+            opt.value = item.id;
+            opt.textContent = item.nombre;
+            pisoSelect.appendChild(opt);
+          });
+        })
+        .catch(err => console.error("Error cargando pisos:", err));
+    });
+  }
+
+  // -------------------------------------------------
+  // 2) Objetos: categoría -> objeto -> tipo de objeto
+  //    Usando delegación sobre #objetos-container
+  // -------------------------------------------------
+  const objetosContainer = document.getElementById("objetos-container");
+
+  if (objetosContainer) {
+    objetosContainer.addEventListener("change", function (e) {
+      const target = e.target;
+      if (!target.name) return;
+
+      // 2.1) Cambio en CATEGORÍA EXISTENTE
+      if (target.name.endsWith("-categoria_existente")) {
+        const card = target.closest(".objeto-form");
+        if (!card) return;
+
+        const objetoSelect = card.querySelector('select[name$="-objeto_existente"]');
+        const tipoSelect = card.querySelector('select[name$="-tipo_objeto_existente"]');
+
+        if (objetoSelect) {
+          objetoSelect.innerHTML = '<option value="">---------</option>';
+        }
+        if (tipoSelect) {
+          tipoSelect.innerHTML = '<option value="">---------</option>';
+        }
+
+        const categoriaId = target.value || "";
+        if (!categoriaId || !objetoSelect) return;
+
+        fetch(`/ajax/objetos-por-categoria/?categoria_id=${categoriaId}`)
+          .then(r => r.json())
+          .then(data => {
+            data.forEach(item => {
+              const opt = document.createElement("option");
+              opt.value = item.id;
+              opt.textContent = item.nombre;
+              objetoSelect.appendChild(opt);
+            });
+          })
+          .catch(err => console.error("Error cargando objetos:", err));
+      }
+
+      // 2.2) Cambio en OBJETO EXISTENTE
+      if (target.name.endsWith("-objeto_existente")) {
+        const card = target.closest(".objeto-form");
+        if (!card) return;
+
+        const tipoSelect = card.querySelector('select[name$="-tipo_objeto_existente"]');
+        if (!tipoSelect) return;
+
+        tipoSelect.innerHTML = '<option value="">---------</option>';
+
+        const objetoId = target.value || "";
+        if (!objetoId) return;
+
+        fetch(`/ajax/tipos-por-objeto/?objeto_id=${objetoId}`)
+          .then(r => r.json())
+          .then(data => {
+            data.forEach(item => {
+              const opt = document.createElement("option");
+              opt.value = item.id;
+              opt.textContent = item.nombre;
+              tipoSelect.appendChild(opt);
+            });
+          })
+          .catch(err => console.error("Error cargando tipos de objeto:", err));
+      }
+    });
+  }
+});
+</script>
+
 {% endblock %}
