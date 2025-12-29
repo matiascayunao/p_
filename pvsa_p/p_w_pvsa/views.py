@@ -1680,3 +1680,34 @@ def ajax_tipos_por_objeto(request):
         for t in qs
     ]
     return JsonResponse(data, safe=False)
+
+def ajax_objetos_tipicos_por_tipo_lugar(request):
+    tipo_lugar_pk=request.GET.get("tipo_lugar_pk")
+
+    MAPA_OBJETOS_TIPICOS={
+        "Baño":[
+            "Paredes",
+            "Techo",
+            "Luces",
+            "Piso",
+            "Puertas",
+            "Extractor de aire",
+            "Tasas",
+            "Urinarios",
+            "Desagues",
+            "Jaboneras",
+            "Papeleros",
+            "Espejos",
+            "Dispensador de papel",
+            "Lavamanos",
+            "Dispensador de jabón",
+        ]
+    }
+    try:
+        tipo_lugar=TipoLugar.objects.get(pk=tipo_lugar_pk)
+    except TipoLugar.DoesNotExist:
+        return JsonResponse({"objetos":[]})
+
+    objetos= MAPA_OBJETOS_TIPICOS.get(tipo_lugar.tipo_de_lugar,[])
+
+    return JsonResponse({"objetos": objetos})

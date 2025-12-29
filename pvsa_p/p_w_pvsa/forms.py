@@ -399,9 +399,7 @@ class ObjetoLugarFilaForm(forms.Form):
         tiene_tipo = cleaned.get("tipo_objeto_existente")
         tiene_marca_o_material = (cleaned.get("marca") or "").strip() or (cleaned.get("material") or "").strip()
         if not tiene_tipo and not tiene_marca_o_material:
-            raise forms.ValidationError(
-                "En cada fila selecciona un tipo de objeto existente o escribe marca/material."
-            )
+            pass
 
         # Cantidad y estado obligatorios si la fila se usa
         if cleaned.get("cantidad") in (None, ""):

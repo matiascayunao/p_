@@ -369,6 +369,25 @@
     </form>
 </div>
 
+<div class="modal fade" id="modalObjetosTipicos" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Objetos típicos del lugar</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Marca los objetos que deseas agregar automáticamente.</p>
+                <div id="lista-objetos-tipicos"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-primary">Agregar seleccionados</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {# === TU SCRIPT ORIGINAL: NO LO TOCO === #}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -562,6 +581,33 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 });
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded",function(){
+
+    const tipoLugarSelect = document.getElementById("id_tipo_lugar_existente");
+    const modalEl=document.getElementById("modalObjetosTipicos");
+    const lista=document.getElementById("lista-objetos-tipicos");
+    const btnAgregar=document.getElementById("btnAgregarObjetosTipicos");
+    const objetosContainer=document.getElementById("objetos-container");
+    const totalFormsInput=document.getElementById("id_obj-TOTAL_FORMS");
+    const emptyFormDiv=document.getElementById("empty-form");
+
+
+    if (!tipoLugarSelect) return;
+
+    tipoLugarSelect.addEventListener("change",function(){
+        const tipoLugarPk = this.value;
+        if (!tipoLugarPk) return;
+        fetch('/ajax/objetos-tipicos-por-tipo-lugar/?tipo_lugar_pk=${tipoLugarPk}').then(r => r.json()).then(data => {lista.innerHTML ="";})
+            if (!data.objetos || data.objetos.length ===0) return ;
+            data.objetos.forEach(nombre => {
+                const div = document.createElement("div");
+                div.classList.add("form-check");
+            })
+    })
+})
 </script>
 
 {% endblock %}

@@ -97,12 +97,16 @@ class TipoObjeto(models.Model):
         verbose_name="objeto",
         on_delete=models.RESTRICT,
     )
-    marca = models.CharField(max_length=100, verbose_name="marca", unique=True)
-    material = models.CharField(max_length=100, verbose_name="material", unique=True, blank=True)
+    marca = models.CharField(max_length=100, verbose_name="marca", blank=True, null=True)
+    material = models.CharField(max_length=100, verbose_name="material", blank=True, null=True)
+
+        
 
     def __str__(self):
-        # Objeto + marca + material, ideal para combos
-        return f"{self.objeto.nombre_del_objeto} - {self.marca} {self.material}"
+        marca_txt=self.marca.strip() or ""
+        material_txt= self.material.strip() or ""
+
+        return f"{self.objeto.nombre_del_objeto} - {marca_txt} {material_txt}".strip()
 
 
 class ObjetoLugar(models.Model):
@@ -131,6 +135,8 @@ class ObjetoLugar(models.Model):
         verbose_name="tipo de objeto",
         on_delete=models.RESTRICT,
         related_name="objetos_lugar",
+        blank=True,
+        null=True
     )
 
     def __str__(self):
