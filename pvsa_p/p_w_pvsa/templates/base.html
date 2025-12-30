@@ -59,6 +59,10 @@
             <!-- Menú central -->
             <ul class="navbar-nav mx-auto align-items-lg-center gap-lg-1">
 
+              <li class="nav-item pe-2">
+                <a  class=" nav-link fw-semibold" role="button"  href="{% url 'crear_estructura' %}">FORMULARIO</a>
+              </li>
+
               <!-- SECTOR -->
               <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
@@ -81,16 +85,6 @@
                 </ul>
               </li>
 
-              <!-- PISO -->
-              <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
-                  PISO
-                </a>
-                <ul class="dropdown-menu">
-                  <li><a class="dropdown-item" href="{% url 'lista_pisos' %}">Ver</a></li>
-                  <li><a class="dropdown-item" href="{% url 'crear_piso' %}">Crear</a></li>
-                </ul>
-              </li>
 
               <!-- LUGAR -->
               <li class="nav-item dropdown">
@@ -100,39 +94,6 @@
                 <ul class="dropdown-menu">
                   <li><a class="dropdown-item" href="{% url 'lista_lugares' %}">Ver</a></li>
                   <li><a class="dropdown-item" href="{% url 'crear_lugar' %}">Crear</a></li>
-                </ul>
-              </li>
-
-              <!-- TIPO DE LUGAR -->
-              <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
-                  TIPO DE LUGAR
-                </a>
-                <ul class="dropdown-menu">
-                  <li><a class="dropdown-item" href="{% url 'lista_tipos_lugar' %}">Ver</a></li>
-                  <li><a class="dropdown-item" href="{% url 'crear_tipo_lugar' %}">Crear</a></li>
-                </ul>
-              </li>
-
-              <!-- CATEGORIA -->
-              <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
-                  CATEGORIA DEL OBJETO
-                </a>
-                <ul class="dropdown-menu">
-                  <li><a class="dropdown-item" href="{% url 'lista_categorias' %}">Ver</a></li>
-                  <li><a class="dropdown-item" href="{% url 'crear_categoria_objeto' %}">Crear</a></li>
-                </ul>
-              </li>
-
-              <!-- OBJETO -->
-              <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle fw-semibold" href="#" role="button" data-bs-toggle="dropdown">
-                  OBJETO
-                </a>
-                <ul class="dropdown-menu">
-                  <li><a class="dropdown-item" href="{% url 'lista_objetos' %}">Ver</a></li>
-                  <li><a class="dropdown-item" href="{% url 'crear_objeto' %}">Crear</a></li>
                 </ul>
               </li>
 
@@ -146,6 +107,7 @@
                   <li><a class="dropdown-item" href="{% url 'crear_tipo_objeto' %}">Crear</a></li>
                 </ul>
               </li>
+
 
               <!-- OBJETO DEL LUGAR -->
               <li class="nav-item dropdown">
@@ -175,8 +137,25 @@
                   {{ user.username }}
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Piso</h6></li>
+                    <li><a class="dropdown-item" href="{% url 'lista_pisos' %}">Ver</a></li>
+                    <li><a class="dropdown-item" href="{% url 'crear_piso' %}">Crear</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><h6 class="dropdown-header">Tipo de lugar</h6></li>
+                    <li><a class="dropdown-item" href="{% url 'lista_tipos_lugar' %}">Ver</a></li>
+                    <li><a class="dropdown-item" href="{% url 'crear_tipo_lugar' %}">Crear</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><h6 class="dropdown-header">Categoria del objeto</h6></li>
+                    <li><a class="dropdown-item" href="{% url 'lista_categorias' %}">Ver</a></li>
+                    <li><a class="dropdown-item" href="{% url 'crear_categoria_objeto' %}">Crear</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><h6 class="dropdown-header">Objeto</h6></li>
+                    <li><a class="dropdown-item" href="{% url 'lista_objetos' %}">Ver</a></li>
+                    <li><a class="dropdown-item" href="{% url 'crear_objeto' %}">Crear</a></li>
                   {% if user.is_staff or user.is_superuser %}
+                    <li><hr class="dropdown-header"></li>
                     <li>
+                      <a class="dropdown-item" href="{% url 'descargar_excel_sectores' %}">Descargar Excel</a>
                       <a class="dropdown-item" href="/admin/">Panel Admin</a>
                       <a class="dropdown-item" href="{% url 'signup' %}">Crear usuario</a>
                     </li>

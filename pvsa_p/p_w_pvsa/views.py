@@ -8,6 +8,7 @@ from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from .excel_utils import build_excel_sectores
 from django.db.models import Sum, Q
+from django.views.decorators.http import require_GET
 
 from .forms import (
     CrearSector, CrearUbicacion, CrearPiso, CrearLugar,
@@ -1681,33 +1682,138 @@ def ajax_tipos_por_objeto(request):
     ]
     return JsonResponse(data, safe=False)
 
-def ajax_objetos_tipicos_por_tipo_lugar(request):
-    tipo_lugar_pk=request.GET.get("tipo_lugar_pk")
-
-    MAPA_OBJETOS_TIPICOS={
-        "Baño":[
-            "Paredes",
-            "Techo",
-            "Luces",
-            "Piso",
-            "Puertas",
-            "Extractor de aire",
-            "Tasas",
-            "Urinarios",
-            "Desagues",
-            "Jaboneras",
-            "Papeleros",
+TIPICOS_POR_TIPO_LUGAR = {
+    "Baño": {
+        "Infraestructura": [
+            "Paredes", "Piso", "Cielo", "Techo", "Luces" ,"Ventanas", "Puertas",
+            "Conexión eléctrica", "Interruptores"
+        ],
+        "Sanitario": [
+            "Tasas", "Urinario","Desagües","Papeleros","Lavamanos"
+        ],
+        "Decoración":[
             "Espejos",
-            "Dispensador de papel",
-            "Lavamanos",
-            "Dispensador de jabón",
-        ]
+        ],
+        "Higiene":[
+            "Jaboneras","Dispensadores de papel", "Dispensadores de jabón"
+        ],
+    },
+    "Vestidor": {
+        "Infraestructura": [
+            "Paredes", "Piso", "Cielo", "Techo", "Luces" ,"Ventanas", "Puertas",
+            "Conexión eléctrica", "Interruptores"
+        ],
+        "Mobiliario": [
+            "Bancos", "Casilleros", "Percheros",
+        ],
+        "Sanitario":[
+            "Duchas",
+        ],
+        "Higiene":[
+            "Secadores de toalla","Dispensadores de jabón"
+        ],
+        "Climatización":[
+            "Extractores","Estufas"
+        ],
+    },
+    "Comedor": {
+        "Infraestructura": [
+            "Paredes", "Piso", "Cielo", "Techo", "Luces" ,"Ventanas", "Puertas",
+            "Conexión eléctrica", "Interruptores"
+        ],
+        "Mobiliario":[
+            "Mesas","Sillas","Muebles"
+        ],
+        "Electrodomésticos": [
+            "Refrigerador","Microondas","Dispensador de agua","Televisor",
+        ],
+        "Sanitario":[
+            "Lavaplatos","Papeleros"
+        ],
+        "Climatización":[
+            "Aire acondicionado"
+        ],
+    },
+    "Cafetería":{
+        "Infraestructura": [
+            "Paredes", "Piso", "Cielo", "Techo", "Luces" ,"Ventanas", "Puertas",
+            "Conexión eléctrica", "Interruptores"
+        ],
+        "Mobiliario":[
+            "Mesas","Sillas","Muebles"
+        ],
+        "Electrodomésticos":[
+            "Cafetera","Refrigerador","Dispensador de agua"
+        ],
+        "Climatización":[
+            "Aire acondicionado"
+        ],
+    },
+    "Baño vestidor":{
+        "Infraestructura": [
+            "Paredes", "Piso", "Cielo", "Techo", "Luces" ,"Ventanas", "Puertas",
+            "Conexión eléctrica", "Interruptores"
+        ],
+        "Sanitario": [
+            "Tasas", "Urinario","Desagües","Lavamanos","Duchas","Papeleros"
+        ],
+        "Decoración":[
+            "Espejos",
+        ],
+        "Higiene":[
+            "Secadores de toalla", "Dispensadores de jabón"
+        ],
+        "Mobiliario":[
+            "Bancas","Casilleros",
+        ],
+        "Climatización":[
+            "Extractores"
+        ],
     }
-    try:
-        tipo_lugar=TipoLugar.objects.get(pk=tipo_lugar_pk)
-    except TipoLugar.DoesNotExist:
-        return JsonResponse({"objetos":[]})
+}
 
-    objetos= MAPA_OBJETOS_TIPICOS.get(tipo_lugar.tipo_de_lugar,[])
 
-    return JsonResponse({"objetos": objetos})
+@require_GET
+def objetos_tipicos_por_tipo_lugar(request, tipo_lugar_pk):
+    tipo_lugar = get_object_or_404(TipoLugar, pk=tipo_lugar_pk)
+    conf = TIPICOS_POR_TIPO_LUGAR.get(tipo_lugar.tipo_de_lugar, {})
+
+    # compatibilidad: si alguna vez usaste lista simple
+    if isinstance(conf, list):
+        conf = {"Infraestructura": conf}
+
+    data = []
+
+    for cat_name, nombres in (conf or {}).items():
+        cat_name = (cat_name or "").strip() or "Infraestructura"
+        categoria, _ = CategoriaObjeto.objects.get_or_create(nombre_de_categoria=cat_name)
+
+        for nombre_obj in (nombres or []):
+            nombre_obj = (nombre_obj or "").strip()
+            if not nombre_obj:
+                continue
+
+            obj, _ = Objeto.objects.get_or_create(
+                nombre_del_objeto=nombre_obj,
+                defaults={"objeto_categoria": categoria},
+            )
+
+            # FORZAR categoría según tu config
+            if obj.objeto_categoria_id != categoria.id:
+                obj.objeto_categoria = categoria
+                obj.save(update_fields=["objeto_categoria"])
+
+            tipo, _ = TipoObjeto.objects.get_or_create(
+                objeto=obj,
+                marca="",
+                material="",
+            )
+
+            data.append({
+                "categoria_id": categoria.id,
+                "objeto_id": obj.id,
+                "tipo_objeto_id": tipo.id,
+                "label": f"{cat_name} - {nombre_obj}",
+            })
+
+    return JsonResponse({"objetos": data})

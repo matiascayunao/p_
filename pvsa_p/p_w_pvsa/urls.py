@@ -94,6 +94,6 @@ urlpatterns = [
     path("ajax/objetos-por-categoria/",views.ajax_objetos_por_categoria,name="ajax_objetos_por_categoria",),
     path("ajax/tipos-por-objeto/",views.ajax_tipos_por_objeto,name="ajax_tipos_por_objeto",),
 
-    path("ajax/objetos-tipicos-por-tipo-lugar/",views.ajax_objetos_tipicos_por_tipo_lugar,name="ajax_objetos_tipicos_por_tipo_lugar"),
+    path("api/objetos-tipicos/<int:tipo_lugar_pk>/", views.objetos_tipicos_por_tipo_lugar, name="objetos_tipicos_por_tipo_lugar"),
 
 ]
