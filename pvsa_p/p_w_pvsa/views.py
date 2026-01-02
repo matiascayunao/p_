@@ -23,7 +23,7 @@ from .forms import (
 from .models import (
     Sector, Ubicacion, Piso, Lugar, TipoLugar,
     CategoriaObjeto, Objeto, TipoObjeto,
-    ObjetoLugar, HistoricoObjeto,
+    ObjetoLugar, HistoricoObjeto, TipoLugarObjetoTipico,
 )
 
 # -------------------
@@ -813,12 +813,72 @@ def lista_tipos_lugar(request):
 
 @login_required
 def detalle_tipo_lugar(request, tipo_lugar_id):
+
     tipo = get_object_or_404(TipoLugar, pk=tipo_lugar_id)
+
+    if request.method == "POST":
+        ids = request.POST.getlist("tipicos")
+
+        # normalizamos a ints y evitamos basura
+        nuevos_ids = []
+        for x in ids:
+            try:
+                nuevos_ids.append(int(x))
+            except (TypeError, ValueError):
+                pass
+
+        with transaction.atomic():
+            TipoLugarObjetoTipico.objects.filter(tipo_lugar=tipo).delete()
+            TipoLugarObjetoTipico.objects.bulk_create(
+                [
+                    TipoLugarObjetoTipico(
+                        tipo_lugar=tipo,
+                        tipo_objeto_id=tipo_objeto_id,
+                        activo=True,
+                        orden=i,
+                    )
+                    for i, tipo_objeto_id in enumerate(nuevos_ids)
+                ]
+            )
+
+        return redirect("detalle_tipo_lugar", tipo_lugar_id=tipo.id)
+
     lugares = Lugar.objects.filter(lugar_tipo_lugar=tipo).order_by("nombre_del_lugar")
+
+    tipicos_qs = (
+        TipoLugarObjetoTipico.objects.filter(tipo_lugar=tipo, activo=True)
+        .select_related("tipo_objeto__objeto__objeto_categoria")
+        .order_by(
+            "orden",
+            "tipo_objeto__objeto__objeto_categoria__nombre_de_categoria",
+            "tipo_objeto__objeto__nombre_del_objeto",
+            "tipo_objeto__marca",
+            "tipo_objeto__material",
+        )
+    )
+    tipicos_ids = list(tipicos_qs.values_list("tipo_objeto_id", flat=True))
+
+    tipos_objeto = (
+        TipoObjeto.objects.select_related("objeto__objeto_categoria")
+        .all()
+        .order_by(
+            "objeto__objeto_categoria__nombre_de_categoria",
+            "objeto__nombre_del_objeto",
+            "marca",
+            "material",
+        )
+    )
+
     return render(
         request,
         "tipo_lugar/detalle_tipo_lugar.html",
-        {"tipo": tipo, "lugares": lugares},
+        {
+            "tipo": tipo,
+            "lugares": lugares,
+            "tipicos": tipicos_qs,
+            "tipicos_ids": tipicos_ids,
+            "tipos_objeto": tipos_objeto,
+        },
     )
 
 
@@ -1775,45 +1835,86 @@ TIPICOS_POR_TIPO_LUGAR = {
 
 @require_GET
 def objetos_tipicos_por_tipo_lugar(request, tipo_lugar_pk):
-    tipo_lugar = get_object_or_404(TipoLugar, pk=tipo_lugar_pk)
-    conf = TIPICOS_POR_TIPO_LUGAR.get(tipo_lugar.tipo_de_lugar, {})
 
-    # compatibilidad: si alguna vez usaste lista simple
-    if isinstance(conf, list):
-        conf = {"Infraestructura": conf}
+    tipo_lugar = get_object_or_404(TipoLugar, pk=tipo_lugar_pk)
+
+    qs = (
+        TipoLugarObjetoTipico.objects.filter(tipo_lugar=tipo_lugar, activo=True)
+        .select_related("tipo_objeto__objeto__objeto_categoria")
+        .order_by(
+            "orden",
+            "tipo_objeto__objeto__objeto_categoria__nombre_de_categoria",
+            "tipo_objeto__objeto__nombre_del_objeto",
+            "tipo_objeto__marca",
+            "tipo_objeto__material",
+        )
+    )
+
+    # Seed automático (1 sola vez) desde tu TIPICOS_POR_TIPO_LUGAR, y queda en DB
+    if not qs.exists():
+        tipicos = TIPICOS_POR_TIPO_LUGAR.get(tipo_lugar.tipo_de_lugar, {})
+
+        if tipicos:
+            orden = 0
+            with transaction.atomic():
+                for nombre_categoria, lista_objetos in tipicos.items():
+                    categoria_obj, _ = CategoriaObjeto.objects.get_or_create(
+                        nombre_de_categoria=nombre_categoria
+                    )
+
+                    for nombre_obj in lista_objetos:
+                        obj, _ = Objeto.objects.get_or_create(
+                            nombre_del_objeto=nombre_obj,
+                            defaults={"objeto_categoria": categoria_obj},
+                        )
+                        # si ya existía pero con otra categoría, no lo tocamos
+                        if obj.objeto_categoria_id != categoria_obj.id:
+                            categoria_obj = obj.objeto_categoria
+
+                        tipo_objeto, _ = TipoObjeto.objects.get_or_create(
+                            objeto=obj,
+                            marca="",
+                            material="",
+                        )
+
+                        TipoLugarObjetoTipico.objects.get_or_create(
+                            tipo_lugar=tipo_lugar,
+                            tipo_objeto=tipo_objeto,
+                            defaults={"activo": True, "orden": orden},
+                        )
+                        orden += 1
+
+            qs = (
+                TipoLugarObjetoTipico.objects.filter(tipo_lugar=tipo_lugar, activo=True)
+                .select_related("tipo_objeto__objeto__objeto_categoria")
+                .order_by(
+                    "orden",
+                    "tipo_objeto__objeto__objeto_categoria__nombre_de_categoria",
+                    "tipo_objeto__objeto__nombre_del_objeto",
+                    "tipo_objeto__marca",
+                    "tipo_objeto__material",
+                )
+            )
 
     data = []
+    for rel in qs:
+        t = rel.tipo_objeto
+        cat = t.objeto.objeto_categoria
+        obj = t.objeto
 
-    for cat_name, nombres in (conf or {}).items():
-        cat_name = (cat_name or "").strip() or "Infraestructura"
-        categoria, _ = CategoriaObjeto.objects.get_or_create(nombre_de_categoria=cat_name)
+        marca = (t.marca or "").strip()
+        material = (t.material or "").strip()
+        extra = ""
+        if marca or material:
+            extra = f" ({marca} {material})".strip()
 
-        for nombre_obj in (nombres or []):
-            nombre_obj = (nombre_obj or "").strip()
-            if not nombre_obj:
-                continue
-
-            obj, _ = Objeto.objects.get_or_create(
-                nombre_del_objeto=nombre_obj,
-                defaults={"objeto_categoria": categoria},
-            )
-
-            # FORZAR categoría según tu config
-            if obj.objeto_categoria_id != categoria.id:
-                obj.objeto_categoria = categoria
-                obj.save(update_fields=["objeto_categoria"])
-
-            tipo, _ = TipoObjeto.objects.get_or_create(
-                objeto=obj,
-                marca="",
-                material="",
-            )
-
-            data.append({
-                "categoria_id": categoria.id,
+        data.append(
+            {
+                "categoria_id": cat.id,
                 "objeto_id": obj.id,
-                "tipo_objeto_id": tipo.id,
-                "label": f"{cat_name} - {nombre_obj}",
-            })
+                "tipo_objeto_id": t.id,
+                "label": f"{cat.nombre_de_categoria} - {obj.nombre_del_objeto}{extra}",
+            }
+        )
 
-    return JsonResponse({"objetos": data})
+    return JsonResponse(data, safe=False)

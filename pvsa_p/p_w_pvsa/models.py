@@ -108,6 +108,30 @@ class TipoObjeto(models.Model):
 
         return f"{self.objeto.nombre_del_objeto} - {marca_txt} {material_txt}".strip()
 
+class TipoLugarObjetoTipico(models.Model):
+    tipo_lugar = models.ForeignKey(
+        TipoLugar,
+        verbose_name="tipo de lugar",
+        on_delete=models.CASCADE,
+        related_name="tipicos",
+    )
+    tipo_objeto = models.ForeignKey(
+        TipoObjeto,
+        verbose_name="tipo de objeto",
+        on_delete=models.CASCADE,
+        related_name="tipico_en",
+    )
+    activo = models.BooleanField(default=True)
+    orden = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        unique_together = ("tipo_lugar", "tipo_objeto")
+        ordering = ("orden", "id")
+
+    def __str__(self):
+        return f"{self.tipo_lugar.tipo_de_lugar} -> {self.tipo_objeto}"
+
+
 
 class ObjetoLugar(models.Model):
     ESTADO = (
