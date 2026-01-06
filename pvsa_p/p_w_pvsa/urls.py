@@ -96,4 +96,23 @@ urlpatterns = [
 
     path("api/objetos-tipicos/<int:tipo_lugar_pk>/", views.objetos_tipicos_por_tipo_lugar, name="objetos_tipicos_por_tipo_lugar"),
 
+
+    # =========================
+    # MAPA (ADMIN + EDITOR)
+    # =========================
+    path("mapa/", views.mapa_admin, name="mapa_admin"),
+    path("mapa/crear/", views.mapa_editor_crear, name="mapa_crear"),
+    path("mapa/guardar/", views.mapa_guardar, name="mapa_guardar"),
+
+    path("mapa/sector/<int:sector_id>/", views.mapa_sector_detalle, name="mapa_sector_detalle"),
+    path("mapa/ubicacion/<int:ubicacion_id>/", views.mapa_ubicacion_detalle, name="mapa_ubicacion_detalle"),
+
+    path("mapa/sector/<int:sector_id>/editar-geom/", views.mapa_sector_editar_geom, name="mapa_sector_editar_geom"),
+    path("mapa/ubicacion/<int:ubicacion_id>/editar-geom/", views.mapa_ubicacion_editar_geom, name="mapa_ubicacion_editar_geom"),
+
+    path("mapa/sector/<int:sector_id>/quitar-geom/", views.mapa_sector_quitar_geom, name="mapa_sector_quitar_geom"),
+    path("mapa/ubicacion/<int:ubicacion_id>/quitar-geom/", views.mapa_ubicacion_quitar_geom, name="mapa_ubicacion_quitar_geom"),
+
+
+
 ]

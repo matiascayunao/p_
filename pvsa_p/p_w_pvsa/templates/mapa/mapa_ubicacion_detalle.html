@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_link %}
+<link href="https://unpkg.com/maplibre-gl@^5.15.0/dist/maplibre-gl.css" rel="stylesheet" />
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-0">Detalle mapa · Ubicación</h3>
+    <div class="text-muted small">{{ ubicacion.ubicacion }} · Sector {{ ubicacion.sector.sector }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'mapa_admin' %}">Volver</a>
+    <a class="btn btn-primary" href="{% url 'mapa_ubicacion_editar_geom' ubicacion.id %}">Editar polígono</a>
+
+    <form method="post" action="{% url 'mapa_ubicacion_quitar_geom' ubicacion.id %}">
+      {% csrf_token %}
+      <button class="btn btn-outline-danger" type="submit">Quitar del mapa</button>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white border-0">
+    <strong>Mapa (SATELITAL)</strong>
+  </div>
+  <div class="card-body">
+    <div id="mapDetalle" style="height:70vh;"></div>
+  </div>
+</div>
+
+{% if geom %}
+  {{ geom|json_script:"geom-detalle" }}
+{% endif %}
+{% endblock %}
+
+{% block extra_script %}
+<script src="https://unpkg.com/maplibre-gl@^5.15.0/dist/maplibre-gl.js"></script>
+<script>
+  const STYLE = {
+    "version": 8,
+    "sources": {
+      "sat": {
+        "type": "raster",
+        "tiles": ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+        "tileSize": 256,
+        "attribution": "Esri"
+      }
+    },
+    "layers": [{ "id": "sat", "type": "raster", "source": "sat" }]
+  };
+
+  const map = new maplibregl.Map({
+    container: "mapDetalle",
+    style: STYLE,
+    center: [-70.65, -33.45],
+    zoom: 14
+  });
+  map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+  const el = document.getElementById("geom-detalle");
+  const geom = el ? JSON.parse(el.textContent) : null;
+
+  map.on("load", () => {
+    if (!geom) return;
+
+    map.addSource("pol", { type: "geojson", data: { type:"Feature", geometry: geom, properties:{} } });
+
+    map.addLayer({ id:"fill", type:"fill", source:"pol", paint:{ "fill-color":"#0d6efd", "fill-opacity":0.25 } });
+    map.addLayer({ id:"line", type:"line", source:"pol", paint:{ "line-color":"#0d6efd", "line-width":3 } });
+
+    const coords = geom.coordinates?.[0] || [];
+    let minX=999, minY=999, maxX=-999, maxY=-999;
+    coords.forEach(([x,y]) => { minX=Math.min(minX,x); minY=Math.min(minY,y); maxX=Math.max(maxX,x); maxY=Math.max(maxY,y); });
+    if (minX < 999) map.fitBounds([[minX,minY],[maxX,maxY]], { padding: 40 });
+  });
+</script>
+{% endblock %}

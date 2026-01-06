@@ -1,12 +1,15 @@
 from django.db import models, transaction
 from django.utils import timezone
+from django.conf import settings
 
 
 class Sector(models.Model):
     sector = models.CharField(max_length=100, unique=True)
 
+    # NUEVO: polígono GeoJSON (Polygon)
+    geom = models.JSONField(null=True, blank=True)
+
     def __str__(self):
-        # Solo el nombre del sector
         return self.sector
 
 
@@ -18,9 +21,12 @@ class Ubicacion(models.Model):
         on_delete=models.RESTRICT,
     )
 
+    # NUEVO: polígono GeoJSON (Polygon)
+    geom = models.JSONField(null=True, blank=True)
+
     def __str__(self):
-        # Ubicación + sector al que pertenece
         return f"{self.ubicacion} | Sector: {self.sector.sector}"
+
 
 
 class Piso(models.Model):
@@ -100,12 +106,9 @@ class TipoObjeto(models.Model):
     marca = models.CharField(max_length=100, verbose_name="marca", blank=True, null=True)
     material = models.CharField(max_length=100, verbose_name="material", blank=True, null=True)
 
-        
-
     def __str__(self):
-        marca_txt=self.marca.strip() or ""
-        material_txt= self.material.strip() or ""
-
+        marca_txt = (self.marca or "").strip()
+        material_txt = (self.material or "").strip()
         return f"{self.objeto.nombre_del_objeto} - {marca_txt} {material_txt}".strip()
 
 class TipoLugarObjetoTipico(models.Model):
@@ -240,3 +243,46 @@ class HistoricoObjeto(models.Model):
             f"estado ant. {self.get_estado_anterior_display()}, "
             f"fecha {self.fecha_anterior.strftime('%d/%m/%Y')})"
         )
+
+
+class AreaMapa(models.Model):
+    """
+    Guarda un polígono (GeoJSON) asociado a un Sector o una Ubicación.
+    No usa GIS/PostGIS: solo JSONField, funciona con SQLite.
+    """
+    TIPO = (
+        ("S", "Sector"),
+        ("U", "Ubicación"),
+    )
+
+    tipo = models.CharField(max_length=1, choices=TIPO)
+
+    sector = models.ForeignKey(
+        Sector,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="areas_mapa",
+    )
+    ubicacion = models.ForeignKey(
+        Ubicacion,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="areas_mapa",
+    )
+
+    nombre = models.CharField(max_length=120)
+    geometry = models.JSONField()  # GeoJSON Geometry (Polygon o MultiPolygon)
+
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    creado = models.DateTimeField(auto_now_add=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.get_tipo_display()}: {self.nombre}"

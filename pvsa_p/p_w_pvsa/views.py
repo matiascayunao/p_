@@ -1,3 +1,4 @@
+import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
@@ -8,7 +9,7 @@ from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from .excel_utils import build_excel_sectores
 from django.db.models import Sum, Q
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 
 from .forms import (
     CrearSector, CrearUbicacion, CrearPiso, CrearLugar,
@@ -24,6 +25,7 @@ from .models import (
     Sector, Ubicacion, Piso, Lugar, TipoLugar,
     CategoriaObjeto, Objeto, TipoObjeto,
     ObjetoLugar, HistoricoObjeto, TipoLugarObjetoTipico,
+    AreaMapa
 )
 
 # -------------------
@@ -224,7 +226,20 @@ def signout(request):
 
 @login_required
 def home(request):
-    return render(request, "home.html")
+    vista_actual = request.GET.get("vista", "sectores")
+    sectores = Sector.objects.order_by("sector")
+    ubicaciones = Ubicacion.objects.select_related("sector").order_by("sector__sector", "ubicacion")
+
+    return render(
+        request,
+        "home.html",
+        {
+            "sectores": sectores,
+            "ubicaciones": ubicaciones,
+            "vista_actual": vista_actual,
+        },
+    )
+
 
 
 # -------------------
@@ -1918,3 +1933,326 @@ def objetos_tipicos_por_tipo_lugar(request, tipo_lugar_pk):
         )
 
     return JsonResponse(data, safe=False)
+
+
+
+def _color_por_pct_malas(total, pct_malas):
+    if not total:
+        return "#9ca3af"  # gris
+    if pct_malas >= 30:
+        return "#ef4444"  # rojo
+    if pct_malas >= 10:
+        return "#f59e0b"  # amarillo
+    return "#22c55e"      # verde
+
+
+def _resumen_sector_dict():
+    qs = (
+        ObjetoLugar.objects
+        .values("lugar__piso__ubicacion__sector_id")
+        .annotate(
+            total=Sum("cantidad"),
+            buenas=Sum("cantidad", filter=Q(estado="B")),
+            pendientes=Sum("cantidad", filter=Q(estado="P")),
+            malas=Sum("cantidad", filter=Q(estado="M")),
+        )
+    )
+    d = {}
+    for r in qs:
+        total = r["total"] or 0
+        malas = r["malas"] or 0
+        pendientes = r["pendientes"] or 0
+        buenas = r["buenas"] or 0
+        pct_malas = round(malas * 100 / total, 1) if total else 0
+        pct_pend = round(pendientes * 100 / total, 1) if total else 0
+        pct_bue = round(buenas * 100 / total, 1) if total else 0
+        d[r["lugar__piso__ubicacion__sector_id"]] = {
+            "total": total,
+            "pct_malas": pct_malas,
+            "pct_pendientes": pct_pend,
+            "pct_buenas": pct_bue,
+        }
+    return d
+
+
+def _resumen_ubicacion_dict():
+    qs = (
+        ObjetoLugar.objects
+        .values("lugar__piso__ubicacion_id")
+        .annotate(
+            total=Sum("cantidad"),
+            buenas=Sum("cantidad", filter=Q(estado="B")),
+            pendientes=Sum("cantidad", filter=Q(estado="P")),
+            malas=Sum("cantidad", filter=Q(estado="M")),
+        )
+    )
+    d = {}
+    for r in qs:
+        total = r["total"] or 0
+        malas = r["malas"] or 0
+        pendientes = r["pendientes"] or 0
+        buenas = r["buenas"] or 0
+        pct_malas = round(malas * 100 / total, 1) if total else 0
+        pct_pend = round(pendientes * 100 / total, 1) if total else 0
+        pct_bue = round(buenas * 100 / total, 1) if total else 0
+        d[r["lugar__piso__ubicacion_id"]] = {
+            "total": total,
+            "pct_malas": pct_malas,
+            "pct_pendientes": pct_pend,
+            "pct_buenas": pct_bue,
+        }
+    return d
+
+def _feature(kind, obj, geom, extra_props=None):
+    props = {
+        "kind": kind,  # "sector" o "ubicacion"
+        "id": obj.id,
+        "name": obj.sector if kind == "sector" else obj.ubicacion,
+        "sector_id": obj.id if kind == "sector" else obj.sector_id,
+        "sector_name": obj.sector if kind == "sector" else obj.sector.sector,
+        "detail_url": reverse("mapa_sector_detalle", kwargs={"sector_id": obj.id}) if kind == "sector"
+                      else reverse("mapa_ubicacion_detalle", kwargs={"ubicacion_id": obj.id}),
+        "edit_geom_url": reverse("mapa_sector_editar_geom", kwargs={"sector_id": obj.id}) if kind == "sector"
+                         else reverse("mapa_ubicacion_editar_geom", kwargs={"ubicacion_id": obj.id}),
+    }
+    if extra_props:
+        props.update(extra_props)
+
+    return {"type": "Feature", "geometry": geom, "properties": props}
+
+
+@login_required
+def mapa_admin(request):
+    sectores = Sector.objects.order_by("sector")
+    ubicaciones = Ubicacion.objects.select_related("sector").order_by("sector__sector", "ubicacion")
+
+    features = []
+    for s in Sector.objects.exclude(geom__isnull=True).exclude(geom={}).order_by("sector"):
+        features.append(_feature("sector", s, s.geom))
+
+    for u in Ubicacion.objects.select_related("sector").exclude(geom__isnull=True).exclude(geom={}).order_by("sector__sector", "ubicacion"):
+        features.append(_feature("ubicacion", u, u.geom))
+
+    fc = {"type": "FeatureCollection", "features": features}
+
+    return render(
+        request,
+        "mapa/mapa_admin.html",
+        {
+            "sectores": sectores,
+            "ubicaciones": ubicaciones,
+            "mapa_geojson": fc,
+        },
+    )
+
+
+@login_required
+def mapa_editor_crear(request):
+    sectores = Sector.objects.order_by("sector")
+    ubicaciones = Ubicacion.objects.select_related("sector").order_by("sector__sector", "ubicacion")
+    features = []
+    for s in Sector.objects.exclude(geom__isnull=True).exclude(geom={}).order_by("sector"):
+        features.append(_feature("sector", s,s.geom,extra_props={
+            "color": "#008000"
+        }))
+    for u in Ubicacion.objects.select_related("sector").exclude(geom__isnull=True).exclude(geom={}).order_by("sector__sector", "ubicacion"):
+        features.append(_feature("ubicacion",u,u.geom,extra_props={
+            "color": "#008000"
+        }))
+    fc = {"type": "FeatureCollection", "features": features}
+    return render(request, "mapa/mapa_editor.html",{
+        "sectores": sectores,
+        "ubicaciones":ubicaciones,
+        "mapa_geojson": fc,
+    })
+
+
+@login_required
+def mapa_sector_editar_geom(request, sector_id):
+    s = get_object_or_404(Sector, pk=sector_id)
+    sectores = Sector.objects.order_by("sector")
+    ubicaciones = Ubicacion.objects.select_related("sector").order_by("sector__sector", "ubicacion")
+
+    return render(
+        request,
+        "mapa/mapa_editor.html",
+        {
+            "modo": "editar",
+            "sectores": sectores,
+            "ubicaciones": ubicaciones,
+            "editar_tipo": "sector",
+            "editar_id": s.id,
+            "obj_label": f"Sector: {s.sector}",
+            "geom_inicial": s.geom,
+        },
+    )
+
+
+@login_required
+def mapa_ubicacion_editar_geom(request, ubicacion_id):
+    u = get_object_or_404(Ubicacion, pk=ubicacion_id)
+    sectores = Sector.objects.order_by("sector")
+    ubicaciones = Ubicacion.objects.select_related("sector").order_by("sector__sector", "ubicacion")
+
+    return render(
+        request,
+        "mapa/mapa_editor.html",
+        {
+            "modo": "editar",
+            "sectores": sectores,
+            "ubicaciones": ubicaciones,
+            "editar_tipo": "ubicacion",
+            "editar_id": u.id,
+            "obj_label": f"Ubicación: {u.ubicacion} (Sector {u.sector.sector})",
+            "geom_inicial": u.geom,
+        },
+    )
+
+
+@login_required
+def mapa_sector_detalle(request, sector_id):
+    s = get_object_or_404(Sector, pk=sector_id)
+    return render(
+        request,
+        "mapa/mapa_sector_detalle.html",
+        {
+            "sector": s,
+            "geom": s.geom,
+        },
+    )
+
+
+@login_required
+def mapa_ubicacion_detalle(request, ubicacion_id):
+    u = get_object_or_404(Ubicacion, pk=ubicacion_id)
+    return render(
+        request,
+        "mapa/mapa_ubicacion_detalle.html",
+        {
+            "ubicacion": u,
+            "geom": u.geom,
+        },
+    )
+
+
+@require_POST
+@login_required
+@transaction.atomic
+def mapa_guardar(request):
+    """
+    Guarda polígono (GeoJSON Polygon) en Sector.geom o Ubicacion.geom.
+    - Crear: permite Sector existente/nuevo o Ubicación existente/nueva.
+    - Editar: reemplaza geom del objetivo.
+    """
+    geom_json = (request.POST.get("geom_json") or "").strip()
+    if not geom_json:
+        return redirect("mapa_admin")
+
+    try:
+        geom = json.loads(geom_json)
+    except Exception:
+        return redirect("mapa_admin")
+
+    modo = request.POST.get("accion", "crear")
+
+    # ========= EDITAR =========
+    if modo == "editar":
+        editar_tipo = request.POST.get("editar_tipo")
+        editar_id = request.POST.get("editar_id")
+        try:
+            editar_id = int(editar_id)
+        except Exception:
+            return redirect("mapa_admin")
+
+        if editar_tipo == "sector":
+            s = get_object_or_404(Sector, pk=editar_id)
+            s.geom = geom
+            s.save()
+            return redirect("mapa_sector_detalle", sector_id=s.id)
+
+        if editar_tipo == "ubicacion":
+            u = get_object_or_404(Ubicacion, pk=editar_id)
+            u.geom = geom
+            u.save()
+            return redirect("mapa_ubicacion_detalle", ubicacion_id=u.id)
+
+        return redirect("mapa_admin")
+
+    # ========= CREAR =========
+    tipo_registro = request.POST.get("tipo_registro", "sector")  # "sector" | "ubicacion"
+
+    if tipo_registro == "sector":
+        sector_existente = request.POST.get("sector_existente", "").strip()
+        sector_nuevo = (request.POST.get("sector_nuevo") or "").strip()
+
+        sector_obj = None
+        if sector_existente:
+            try:
+                sector_obj = Sector.objects.get(pk=int(sector_existente))
+            except Exception:
+                sector_obj = None
+
+        if not sector_obj and sector_nuevo:
+            sector_obj, _ = Sector.objects.get_or_create(sector=sector_nuevo)
+
+        if not sector_obj:
+            return redirect("mapa_crear")
+
+        sector_obj.geom = geom
+        sector_obj.save()
+        return redirect("mapa_sector_detalle", sector_id=sector_obj.id)
+
+    # tipo_registro == "ubicacion"
+    sector_id = request.POST.get("sector_para_ubicacion", "").strip()
+    try:
+        sector_obj = Sector.objects.get(pk=int(sector_id))
+    except Exception:
+        return redirect("mapa_crear")
+
+    ubicacion_existente = request.POST.get("ubicacion_existente", "").strip()
+    ubicacion_nueva = (request.POST.get("ubicacion_nueva") or "").strip()
+
+    ubic_obj = None
+    if ubicacion_existente:
+        try:
+            ubic_obj = Ubicacion.objects.get(pk=int(ubicacion_existente))
+        except Exception:
+            ubic_obj = None
+
+    if not ubic_obj and ubicacion_nueva:
+        ubic_obj, _ = Ubicacion.objects.get_or_create(
+            ubicacion=ubicacion_nueva,
+            defaults={"sector": sector_obj},
+        )
+        # si ya existía con otro sector, NO lo cambiamos
+
+    if not ubic_obj:
+        return redirect("mapa_crear")
+
+    ubic_obj.geom = geom
+    ubic_obj.save()
+    return redirect("mapa_ubicacion_detalle", ubicacion_id=ubic_obj.id)
+
+
+@login_required
+def mapa_sector_quitar_geom(request, sector_id):
+    s = get_object_or_404(Sector, pk=sector_id)
+    if request.method == "POST":
+        s.geom = None
+        s.save()
+        return redirect("mapa_sector_detalle", sector_id=s.id)
+
+    cancel_url = reverse("mapa_sector_detalle", kwargs={"sector_id": s.id})
+    return render(request, "mapa/confirm_quitar_geom.html", {"obj": s, "cancel_url": cancel_url})
+
+
+@login_required
+def mapa_ubicacion_quitar_geom(request, ubicacion_id):
+    u = get_object_or_404(Ubicacion, pk=ubicacion_id)
+    if request.method == "POST":
+        u.geom = None
+        u.save()
+        return redirect("mapa_ubicacion_detalle", ubicacion_id=u.id)
+
+    cancel_url = reverse("mapa_ubicacion_detalle", kwargs={"ubicacion_id": u.id})
+    return render(request, "mapa/confirm_quitar_geom.html", {"obj": u, "cancel_url": cancel_url})

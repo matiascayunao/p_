@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_link %}
+  <!-- MapLibre (FIX: usar jsDelivr, no unpkg) -->
+  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+
+  <style>
+    /* Control panel dentro del mapa */
+    .map-panel {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: rgba(255,255,255,.95);
+      border: 1px solid rgba(0,0,0,.12);
+      border-radius: 10px;
+      padding: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.12);
+      max-width: 260px;
+    }
+    .map-panel .rowx { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+    .map-panel label { font-size: 12px; color:#555; width: 85px; }
+    .map-panel select { flex:1; font-size: 13px; padding: 6px 8px; border-radius: 8px; border: 1px solid #ddd; }
+    .map-panel .hint { font-size: 12px; color:#666; margin-top:6px; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-0">Editor del mapa</h3>
+    <div class="text-muted small">
+      {% if modo == "editar" %}
+        Reemplazar polígono · {{ obj_label }}
+      {% else %}
+        Dibuja manualmente con clicks y guarda como Sector o Ubicación
+      {% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'mapa_admin' %}">Volver</a>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white border-0 d-flex flex-wrap gap-2 align-items-center">
+    <button id="btnMarcar" class="btn btn-outline-primary">ACTIVAR MARCADO (CLICK)</button>
+    <button id="btnDeshacer" class="btn btn-outline-secondary">Deshacer</button>
+    <button id="btnLimpiar" class="btn btn-outline-secondary">Limpiar</button>
+    <button id="btnListo" class="btn btn-success">LISTO</button>
+
+    <span class="ms-auto badge bg-light text-muted fw-normal" id="estadoModo">Modo: OFF</span>
+    <span class="badge bg-light text-muted fw-normal" id="contador">Puntos: 0</span>
+  </div>
+
+  <div class="card-body">
+    <div id="mapaEditor" style="height: 70vh; width:100%; border-radius: .5rem;"></div>
+  </div>
+</div>
+
+<!-- Modal Guardar -->
+<div class="modal fade" id="modalGuardar" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Guardar polígono</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <form method="post" action="{% url 'mapa_guardar' %}">
+        {% csrf_token %}
+
+        <input type="hidden" name="geom_json" id="geom_json">
+        <input type="hidden" name="accion" value="{{ modo }}">
+        <input type="hidden" name="editar_tipo" value="{{ editar_tipo }}">
+        <input type="hidden" name="editar_id" value="{{ editar_id }}">
+
+        <div class="modal-body">
+
+          {% if modo == "editar" %}
+            <div class="alert alert-info mb-3">
+              Se reemplazará la geometría de: <strong>{{ obj_label }}</strong>
+            </div>
+          {% else %}
+            <div class="mb-3">
+              <label class="form-label">¿Qué quieres crear en el mapa?</label>
+              <select class="form-select" id="tipoRegistro" name="tipo_registro">
+                <option value="sector">Sector</option>
+                <option value="ubicacion">Ubicación</option>
+              </select>
+            </div>
+
+            <!-- Sector (crear o existente) -->
+            <div id="bloqueSector" class="border rounded p-3 mb-3">
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label">Sector existente</label>
+                  <select class="form-select" name="sector_existente" id="sectorExistente">
+                    <option value="">-- seleccionar --</option>
+                    {% for s in sectores %}
+                      <option value="{{ s.id }}">{{ s.sector }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Sector nuevo</label>
+                  <input class="form-control" name="sector_nuevo" placeholder="Nombre del sector">
+                </div>
+              </div>
+            </div>
+
+            <!-- Ubicación (crear o existente) -->
+            <div id="bloqueUbicacion" class="border rounded p-3 mb-3" style="display:none;">
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label">Sector (para ubicación)</label>
+                  <select class="form-select" name="sector_para_ubicacion" id="sectorParaUbicacion">
+                    <option value="">-- seleccionar --</option>
+                    {% for s in sectores %}
+                      <option value="{{ s.id }}">{{ s.sector }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">Ubicación existente</label>
+                  <select class="form-select" name="ubicacion_existente" id="ubicacionExistente">
+                    <option value="">-- seleccionar --</option>
+                    {% for u in ubicaciones %}
+                      <option value="{{ u.id }}" data-sector="{{ u.sector_id }}">
+                        {{ u.ubicacion }} ({{ u.sector.sector }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label">Ubicación nueva</label>
+                  <input class="form-control" name="ubicacion_nueva" placeholder="Nombre de la ubicación">
+                </div>
+              </div>
+              <div class="small text-muted mt-2">La lista de ubicaciones se filtra por el sector seleccionado.</div>
+            </div>
+          {% endif %}
+
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">Guardar</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+{% if geom_inicial %}
+  {{ geom_inicial|json_script:"geom-inicial" }}
+{% endif %}
+
+{% comment %}
+  Opcional: si algún día le pasas GeoJSON con sectores/ubicaciones al editor,
+  lo puedes poner aquí con json_script id="mapa-data" (el JS lo leerá si existe).
+{% endcomment %}
+
+{% endblock %}
+
+{% block extra_script %}
+  <!-- MapLibre (FIX) -->
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+  <!-- Tu JS -->
+  <script src="{% static 'p_w_pvsa/js/mapa_editor.js' %}?v=100"></script>
+{% endblock %}

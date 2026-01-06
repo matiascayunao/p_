@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_link %}
+<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-0">Administrador del mapa</h3>
+    <div class="text-muted small">Ver · Detalles · Editar geometría · Quitar del mapa</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-primary" href="{% url 'mapa_crear' %}">Marcar en terreno</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white border-0">
+        <strong>Filtros</strong>
+      </div>
+      <div class="card-body">
+        <div class="mb-2">
+          <label class="form-label small text-muted">Vista</label>
+          <select id="mapVista" class="form-select">
+            <option value="todo">Todo</option>
+            <option value="sector">Sectores</option>
+            <option value="ubicacion">Ubicaciones</option>
+          </select>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small text-muted">Sector</label>
+          <select id="mapSector" class="form-select">
+            <option value="">Todos</option>
+            {% for s in sectores %}
+              <option value="{{ s.id }}">{{ s.sector }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small text-muted">Ubicación</label>
+          <select id="mapUbicacion" class="form-select">
+            <option value="">Todas</option>
+            {% for u in ubicaciones %}
+              <option value="{{ u.id }}" data-sector="{{ u.sector_id }}">
+                {{ u.ubicacion }} ({{ u.sector.sector }})
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" id="btnLimpiar">Limpiar</button>
+        </div>
+
+        <hr>
+
+        <div class="small text-muted mb-2">Elementos con polígono</div>
+        <div class="list-group" id="listaFeatures" style="max-height: 45vh; overflow:auto;"></div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-8">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+        <strong>Mapa</strong>
+        <span class="badge bg-light text-muted fw-normal">Click en un polígono para acciones</span>
+      </div>
+      <div class="card-body">
+        <div id="mapaAdmin" style="height: 70vh; width:100%; border-radius: .5rem;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ mapa_geojson|json_script:"mapa-data" }}
+
+{% endblock %}
+
+{% block extra_script %}
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="{% static 'p_w_pvsa/js/mapa_admin.js' %}?v=1"></script>
+{% endblock %}
