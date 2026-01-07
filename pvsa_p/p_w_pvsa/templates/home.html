@@ -1,25 +1,12 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block extra_link %}
-<link href="https://unpkg.com/maplibre-gl@^5.15.0/dist/maplibre-gl.css" rel="stylesheet" />
-
-
-{% endblock %}
 {% block content %}
 
 <div class="py-2 py-lg-3">
-  <div class="card shadow-sm border-0 mt-4">
-      <div class="card-header bg-white border-0">
-          <h5 class="mb-0">Mapa</h5>
-      </div>
-      <div class="card-body">
-          <div id="map" style="height: 450px; width: 100%;"></div>
-      </div>
-  </div>
 
   <!-- Encabezado + acciones principales -->
-  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3 mb-4 mt-4">
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3 mb-4 mt-2">
     <div>
       <h1 class="h3 mb-1">Panel principal</h1>
       <p class="text-muted mb-0">
@@ -29,74 +16,105 @@
     </div>
 
     <div class="d-grid d-sm-flex gap-2">
-      <a href="{% url 'crear_estructura' %}" class="btn btn-success">
+      <a href="{% url 'crear_estructura' %}" class="btn btn-warning">
         Carga completa
       </a>
-      <a href="{% url 'descargar_excel_sectores' %}" class="btn btn-outline-success">
+      <a href="{% url 'descargar_excel_sectores' %}" class="btn btn-success">
         Descargar Excel
       </a>
-      <a href="{% url 'resumen_general' %}" class="btn btn-outline-primary">
+      <a href="{% url 'resumen_general' %}" class="btn btn-info">
         Ver resumen general
+      </a>
+      <a class="btn btn-info" href="{% url 'mapa_admin' %}">
+        Administrador del mapa
       </a>
     </div>
   </div>
 
-  <!-- Operaciones rápidas (en tarjetas) -->
-  <div class="mb-4">
-    <div class="row g-3 row-cols-1 row-cols-lg-3">
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-0 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+      <h5 class="mb-0">Principales</h5>
+      <span class="badge bg-light text-muted fw-normal">Carga completa · Mapa · Resumen · Excel</span>
+    </div>
 
-      <div class="col">
-        <div class="card shadow-sm border-0 h-100">
-          <div class="card-body">
-            <h6 class="text-muted text-uppercase small mb-1">Formulario unificado</h6>
-            <p class="small text-muted mb-3">
-              Crea sector, ubicación, piso, lugar y objetos en una sola pantalla.
-            </p>
-            <div class="d-grid">
-              <a href="{% url 'crear_estructura' %}" class="btn btn-success">
+    <div class="card-body">
+      <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-3">
+
+
+
+        <div class="col">
+          <div class="card border-0 bg-light h-100">
+            <div class="card-body">
+              <h6 class="text-muted text-uppercase small mb-1">Formulario unificado</h6>
+              <p class="small text-muted mb-3">
+                Crea sector, ubicación, piso, lugar y objetos en una sola pantalla.
+              </p>
+              <div class="d-grid">
+              <a href="{% url 'crear_estructura' %}" class="btn btn-warning">
                 Carga completa
               </a>
             </div>
-          </div>
-        </div>
-      </div>
+           </div>
+         </div>
+       </div>
 
-      <div class="col">
-        <div class="card shadow-sm border-0 h-100">
-          <div class="card-body">
-            <h6 class="text-muted text-uppercase small mb-1">Exportar estructura</h6>
-            <p class="small text-muted mb-3">
-              Descarga un archivo Excel con la información de sectores, ubicaciones, pisos y lugares.
-            </p>
-            <div class="d-grid">
-              <a href="{% url 'descargar_excel_sectores' %}" class="btn btn-outline-success">
-                Descargar Excel
-              </a>
+       <div class="col">
+          <div class="card border-0 bg-light h-100">
+            <div class="card-body">
+              <h6 class="text-muted text-uppercase small mb-1">Mapa</h6>
+              <p class="small text-muted mb-3">
+                Delimita sectores y ubicaciones en un mapa.
+              </p>
+              <div class="d-grid gap-2">
+                <a class="btn btn-info" href="{% url 'mapa_admin' %}">Administrador del mapa</a>
+                <a class="btn btn-secondary" href="{% url 'mapa_crear' %}">Marcar en terreno</a>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="col">
-        <div class="card shadow-sm border-0 h-100">
-          <div class="card-body">
-            <h6 class="text-muted text-uppercase small mb-1">Reportes</h6>
-            <p class="small text-muted mb-3">
-              Visualiza estadísticas de estado por sector, ubicación y objeto.
-            </p>
-            <div class="d-grid">
-              <a href="{% url 'resumen_general' %}" class="btn btn-outline-primary">
-                Ver resumen general
-              </a>
+        <div class="col">
+          <div class="card border-0 bg-light h-100">
+            <div class="card-body">
+              <h6 class="text-muted text-uppercase small mb-1">Reportes</h6>
+              <p class="small text-muted mb-3">
+                Visualiza estadísticas de estado por sector, ubicación y objeto.
+              </p>
+              <div class="d-grid">
+                <a href="{% url 'resumen_general' %}" class="btn btn-info">
+                  Ver resumen general
+                </a>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
+
+
+        <div class="col">
+          <div class="card border-0 bg-light h-100">
+            <div class="card-body">
+              <h6 class="text-muted text-uppercase small mb-1">Exportar estructura</h6>
+              <p class="small text-muted mb-3">
+                Descarga un archivo Excel con la información de sectores, ubicaciones, pisos y lugares.
+              </p>
+              <div class="d-grid">
+                <a href="{% url 'descargar_excel_sectores' %}" class="btn btn-success">
+                  Descargar Excel
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
   </div>
+  
+    
+  
 
-  <!-- Estructura del puerto -->
+  
   <div class="card shadow-sm border-0 mb-4">
     <div class="card-header bg-white border-0 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
       <h5 class="mb-0">Estructura del puerto</h5>
@@ -111,8 +129,8 @@
             <div class="card-body">
               <h6 class="text-uppercase small mb-2">Sector</h6>
               <div class="d-grid gap-2">
-                <a href="{% url 'lista_sectores' %}" class="btn btn-outline-primary btn-sm">Ver sectores</a>
-                <a href="{% url 'crear_sector' %}" class="btn btn-outline-secondary btn-sm">Crear sector</a>
+                <a href="{% url 'lista_sectores' %}" class="btn btn-info btn-sm">Ver sectores</a>
+                <a href="{% url 'crear_sector' %}" class="btn btn-secondary btn-sm">Crear sector</a>
               </div>
             </div>
           </div>
@@ -123,8 +141,8 @@
             <div class="card-body">
               <h6 class="text-uppercase small mb-2">Ubicación</h6>
               <div class="d-grid gap-2">
-                <a href="{% url 'lista_ubicaciones' %}" class="btn btn-outline-primary btn-sm">Ver ubicaciones</a>
-                <a href="/ubicacion/crear/" class="btn btn-outline-secondary btn-sm">Crear ubicación</a>
+                <a href="{% url 'lista_ubicaciones' %}" class="btn btn-info btn-sm">Ver ubicaciones</a>
+                <a href="/ubicacion/crear/" class="btn btn-secondary btn-sm">Crear ubicación</a>
               </div>
             </div>
           </div>
@@ -135,8 +153,8 @@
             <div class="card-body">
               <h6 class="text-uppercase small mb-2">Piso</h6>
               <div class="d-grid gap-2">
-                <a href="/pisos/" class="btn btn-outline-primary btn-sm">Ver pisos</a>
-                <a href="/piso/crear/" class="btn btn-outline-secondary btn-sm">Crear piso</a>
+                <a href="/pisos/" class="btn btn-info btn-sm">Ver pisos</a>
+                <a href="/piso/crear/" class="btn btn-secondary btn-sm">Crear piso</a>
               </div>
             </div>
           </div>
@@ -147,8 +165,8 @@
             <div class="card-body">
               <h6 class="text-uppercase small mb-2">Lugar</h6>
               <div class="d-grid gap-2">
-                <a href="/lugares/" class="btn btn-outline-primary btn-sm">Ver lugares</a>
-                <a href="/lugar/crear/" class="btn btn-outline-secondary btn-sm">Crear lugar</a>
+                <a href="/lugares/" class="btn btn-info btn-sm">Ver lugares</a>
+                <a href="/lugar/crear/" class="btn btn-secondary btn-sm">Crear lugar</a>
               </div>
             </div>
           </div>
@@ -159,8 +177,8 @@
             <div class="card-body">
               <h6 class="text-uppercase small mb-2">Tipo de lugar</h6>
               <div class="d-grid gap-2">
-                <a href="/tipo-lugar/" class="btn btn-outline-primary btn-sm">Ver tipos de lugar</a>
-                <a href="/tipo-lugar/crear/" class="btn btn-outline-secondary btn-sm">Crear tipo de lugar</a>
+                <a href="/tipo-lugar/" class="btn btn-info btn-sm">Ver tipos de lugar</a>
+                <a href="/tipo-lugar/crear/" class="btn btn-secondary btn-sm">Crear tipo de lugar</a>
               </div>
             </div>
           </div>
@@ -187,8 +205,8 @@
                 <div class="card-body">
                   <h6 class="text-uppercase small mb-2">Categoría</h6>
                   <div class="d-grid gap-2">
-                    <a href="/categorias/" class="btn btn-outline-primary btn-sm">Ver categorías</a>
-                    <a href="/categoria/crear/" class="btn btn-outline-secondary btn-sm">Crear categoría</a>
+                    <a href="/categorias/" class="btn btn-info btn-sm">Ver categorías</a>
+                    <a href="/categoria/crear/" class="btn btn-secondary btn-sm">Crear categoría</a>
                   </div>
                 </div>
               </div>
@@ -199,8 +217,8 @@
                 <div class="card-body">
                   <h6 class="text-uppercase small mb-2">Objeto</h6>
                   <div class="d-grid gap-2">
-                    <a href="/objetos/" class="btn btn-outline-primary btn-sm">Ver objetos</a>
-                    <a href="/objeto/crear/" class="btn btn-outline-secondary btn-sm">Crear objeto</a>
+                    <a href="/objetos/" class="btn btn-info btn-sm">Ver objetos</a>
+                    <a href="/objeto/crear/" class="btn btn-secondary btn-sm">Crear objeto</a>
                   </div>
                 </div>
               </div>
@@ -211,8 +229,8 @@
                 <div class="card-body">
                   <h6 class="text-uppercase small mb-2">Tipo de objeto</h6>
                   <div class="d-grid gap-2">
-                    <a href="/tipos-objeto/" class="btn btn-outline-primary btn-sm">Ver tipos de objeto</a>
-                    <a href="/tipo-objeto/crear/" class="btn btn-outline-secondary btn-sm">Crear tipo de objeto</a>
+                    <a href="/tipos-objeto/" class="btn btn-info btn-sm">Ver tipos de objeto</a>
+                    <a href="/tipo-objeto/crear/" class="btn btn-secondary btn-sm">Crear tipo de objeto</a>
                   </div>
                 </div>
               </div>
@@ -242,7 +260,7 @@
                     Detalle de los objetos asignados a cada lugar.
                   </p>
                   <div class="d-grid">
-                    <a href="/objetos-lugar/" class="btn btn-outline-primary btn-sm">
+                    <a href="/objetos-lugar/" class="btn btn-info btn-sm">
                       Ver objetos del lugar
                     </a>
                   </div>
@@ -258,7 +276,7 @@
                     Cambios de cantidad, estado y detalle registrados en el tiempo.
                   </p>
                   <div class="d-grid">
-                    <a href="/historico/" class="btn btn-outline-primary btn-sm">
+                    <a href="/historico/" class="btn btn-info btn-sm">
                       Ver históricos
                     </a>
                   </div>
@@ -275,10 +293,5 @@
   </div>
 
 </div>
-{% block extra_script %}
-<script src="https://unpkg.com/maplibre-gl@^5.15.0/dist/maplibre-gl.js"></script>
-
-<script src="{% static 'p_w_pvsa/js/map_home.js' %}?v=3"></script>
-{% endblock %}
 
 {% endblock %}

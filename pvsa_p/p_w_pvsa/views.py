@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from .excel_utils import build_excel_sectores
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q, Case, When, IntegerField, F, Value
 from django.views.decorators.http import require_GET, require_POST
 
 from .forms import (
@@ -2023,48 +2023,19 @@ def _feature(kind, obj, geom, extra_props=None):
 
 @login_required
 def mapa_admin(request):
-    sectores = Sector.objects.order_by("sector")
-    ubicaciones = Ubicacion.objects.select_related("sector").order_by("sector__sector", "ubicacion")
-
-    features = []
-    for s in Sector.objects.exclude(geom__isnull=True).exclude(geom={}).order_by("sector"):
-        features.append(_feature("sector", s, s.geom))
-
-    for u in Ubicacion.objects.select_related("sector").exclude(geom__isnull=True).exclude(geom={}).order_by("sector__sector", "ubicacion"):
-        features.append(_feature("ubicacion", u, u.geom))
-
-    fc = {"type": "FeatureCollection", "features": features}
-
-    return render(
-        request,
-        "mapa/mapa_admin.html",
-        {
-            "sectores": sectores,
-            "ubicaciones": ubicaciones,
-            "mapa_geojson": fc,
-        },
+    return render(request, "mapa/mapa_admin.html",{
+        "mapa_geojson":construir_geojson_para_mapa(),}
+        
     )
 
 
 @login_required
 def mapa_editor_crear(request):
-    sectores = Sector.objects.order_by("sector")
-    ubicaciones = Ubicacion.objects.select_related("sector").order_by("sector__sector", "ubicacion")
-    features = []
-    for s in Sector.objects.exclude(geom__isnull=True).exclude(geom={}).order_by("sector"):
-        features.append(_feature("sector", s,s.geom,extra_props={
-            "color": "#008000"
-        }))
-    for u in Ubicacion.objects.select_related("sector").exclude(geom__isnull=True).exclude(geom={}).order_by("sector__sector", "ubicacion"):
-        features.append(_feature("ubicacion",u,u.geom,extra_props={
-            "color": "#008000"
-        }))
-    fc = {"type": "FeatureCollection", "features": features}
     return render(request, "mapa/mapa_editor.html",{
-        "sectores": sectores,
-        "ubicaciones":ubicaciones,
-        "mapa_geojson": fc,
-    })
+        "mapa_geojson":construir_geojson_para_mapa(),}
+        
+    )
+
 
 
 @login_required
@@ -2256,3 +2227,69 @@ def mapa_ubicacion_quitar_geom(request, ubicacion_id):
 
     cancel_url = reverse("mapa_ubicacion_detalle", kwargs={"ubicacion_id": u.id})
     return render(request, "mapa/confirm_quitar_geom.html", {"obj": u, "cancel_url": cancel_url})
+
+
+
+def _color_por_pct_buenas(pct):
+    if pct is None:
+            return "#9ca3af"
+    if pct >= 65:
+        intensidad = min(max((pct - 65)/ 35, 0),1)
+        return  f"rgb({int(34 - 10*intensidad)},{int(197+30*intensidad)},{int(94-40*intensidad)})"
+    
+    if pct >= 50:
+        intensidad = (pct -50)/15
+        return f"rgb(245, {int(200+20*intensidad)}, 11)"
+    
+    intensidad = min(max(pct / 50, 0),1)
+    return f"rgb({int(239 + 10*(1-intensidad))}, {int(68 * intensidad)}, {int(68 * intensidad)})"
+
+
+def construir_geojson_para_mapa():
+    resumen_sector = _resumen_sector_dict()
+    resumen_ubic = _resumen_ubicacion_dict()
+
+    features = []
+
+    for s in Sector.objects.exclude(geom=True).exclude(geom={}):
+        resumen = resumen_sector.get(s.id, {})
+        pct_buenas= resumen.get("pct_buenas", 0)
+        features.append({
+            "type": "Feature",
+            "geometry":s.geom,
+            "properties":{
+                "kind":"sector",
+                "id":s.id,
+                "name":s.sector,
+                "pct_buenas":pct_buenas,
+                "color": _color_por_pct_buenas(pct_buenas),
+                "detail_url": reverse("mapa_sector_detalle", kwargs={"sector_id": s.id}),
+                "edit_geom_url": reverse("mapa_sector_editar_geom",kwargs={"sector_id":s.id}), 
+
+            },
+        })
+    
+    for u in Ubicacion.objects.select_related("sector").exclude(geom=True).exclude(geom={}):
+        
+        resumen = resumen_ubic.get(u.id,{})
+        pct_buenas = resumen.get("pct_buenas",0)
+        features.append({
+            "type": "Feature",
+            "geometry": u.geom,
+            "properties": {
+                "kind":"ubicacion",
+                "id":u.id,
+                "name":u.ubicacion,
+                "sector":u.sector.sector,
+                "pct_buenas":pct_buenas,
+                "color": _color_por_pct_buenas(pct_buenas),
+                "detail_url": reverse("mapa_ubicacion_detalle",kwargs={"ubicacion_id":u.id}),
+                "edit_geom_url":reverse("mapa_ubicacion_editar_geom",kwargs={"ubicacion_id",u.id}),
+            },
+            
+        })
+    
+    return {
+        "type":"FeatureCollection",
+        "features": features,
+    }

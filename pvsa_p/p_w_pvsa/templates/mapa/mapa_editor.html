@@ -2,25 +2,8 @@
 {% load static %}
 
 {% block extra_link %}
-  <!-- MapLibre (FIX: usar jsDelivr, no unpkg) -->
   <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
 
-  <style>
-    /* Control panel dentro del mapa */
-    .map-panel {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: rgba(255,255,255,.95);
-      border: 1px solid rgba(0,0,0,.12);
-      border-radius: 10px;
-      padding: 10px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.12);
-      max-width: 260px;
-    }
-    .map-panel .rowx { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-    .map-panel label { font-size: 12px; color:#555; width: 85px; }
-    .map-panel select { flex:1; font-size: 13px; padding: 6px 8px; border-radius: 8px; border: 1px solid #ddd; }
-    .map-panel .hint { font-size: 12px; color:#666; margin-top:6px; }
-  </style>
 {% endblock %}
 
 {% block content %}
@@ -88,7 +71,6 @@
               </select>
             </div>
 
-            <!-- Sector (crear o existente) -->
             <div id="bloqueSector" class="border rounded p-3 mb-3">
               <div class="row g-2">
                 <div class="col-md-6">
@@ -107,7 +89,6 @@
               </div>
             </div>
 
-            <!-- Ubicación (crear o existente) -->
             <div id="bloqueUbicacion" class="border rounded p-3 mb-3" style="display:none;">
               <div class="row g-2">
                 <div class="col-md-6">
@@ -157,17 +138,14 @@
   {{ geom_inicial|json_script:"geom-inicial" }}
 {% endif %}
 
-{% comment %}
-  Opcional: si algún día le pasas GeoJSON con sectores/ubicaciones al editor,
-  lo puedes poner aquí con json_script id="mapa-data" (el JS lo leerá si existe).
-{% endcomment %}
+{# IMPORTANTE: esto habilita el overlay dentro del editor #}
+{% if mapa_geojson %}
+  {{ mapa_geojson|json_script:"mapa-data" }}
+{% endif %}
 
 {% endblock %}
 
 {% block extra_script %}
-  <!-- MapLibre (FIX) -->
   <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-
-  <!-- Tu JS -->
-  <script src="{% static 'p_w_pvsa/js/mapa_editor.js' %}?v=100"></script>
+  <script src="{% static 'p_w_pvsa/js/mapa_editor.js' %}?v=200"></script>
 {% endblock %}

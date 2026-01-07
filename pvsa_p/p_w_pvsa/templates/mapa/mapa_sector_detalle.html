@@ -39,6 +39,9 @@
 {% block extra_script %}
 <script src="https://unpkg.com/maplibre-gl@^5.15.0/dist/maplibre-gl.js"></script>
 <script>
+
+  const MAX_ZOOM = 19;
+
   const STYLE = {
     "version": 8,
     "sources": {
@@ -46,6 +49,8 @@
         "type": "raster",
         "tiles": ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
         "tileSize": 256,
+        maxzoom: MAX_ZOOM,
+
         "attribution": "Esri"
       }
     },
@@ -55,8 +60,9 @@
   const map = new maplibregl.Map({
     container: "mapDetalle",
     style: STYLE,
-    center: [-70.65, -33.45],
-    zoom: 14
+    center: [-71.484847, -32.752389],
+    zoom: 18,
+    maxZoom: MAX_ZOOM
   });
   map.addControl(new maplibregl.NavigationControl(), "top-right");
 
