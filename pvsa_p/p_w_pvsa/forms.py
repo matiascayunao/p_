@@ -416,3 +416,11 @@ ObjetoLugarFilaFormSet = formset_factory(
     extra=1,
     can_delete=False,
 )
+
+
+class UploadExcelForm(forms.Form):
+    archivo = forms.FileField(
+        widget=forms.ClearableFileInput(
+            attrs={"class": "form-control", "accept": ".xlsx"}
+        )
+    )

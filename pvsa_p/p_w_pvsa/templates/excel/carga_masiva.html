@@ -1,0 +1,413 @@
+{% extends 'base.html' %}
+
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="mb-0">Carga masiva</h3>
+            <div class="text-muted small"> Subir Excel -> revisar/editar -> guardar en el sistema</div>
+            <div>
+                <a href="{% url 'home' %}" class="btn btn-outline-secondary">Volver</a>
+            </div>
+        </div>  
+        {% if error %}
+        <div class="alert alert-danger">{{error}}</div>
+        {% endif %}
+
+        {% if step == "upload" %}
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-0">
+                    <strong>Subir Excel</strong>
+                </div>
+                <div class="card-body" >
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="parse">
+                        <div class="mb-3">
+                            <label class="form-label">Archivo .xlsx</label>
+                            <input type="file" class="form-control" name="excel" accept=".xlsx" required>
+                        </div>
+                        <button class="btn btn-primary"> Cargar y previsualizar </button>
+                    </form>
+                </div>  
+            </div>
+        {% endif %}
+
+        {% if step == "preview" %}
+        <form method="post" id="formCommit">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="commit">
+            <textarea name="payload_json" id="payload_json" class="d-none"></textarea>
+            <div class="row g-3">
+                <div class="col-12 col-lg-4">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white border-0">
+                            <strong>Resumen</strong>
+
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <div class="small text-muted">Detectado en el Excel</div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Sectores</span>
+                                    <span class="fw-semibold">{{payload.sectores|length}}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Ubicaciones</span>
+                                    <span class="fw-semibold">{{payload.ubicaciones|length}}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Pisos</span>
+                                    <span class="fw-semibold">{{payload.pisos|length}}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Tipos Lugar</span>
+                                    <span class="fw-semibold">{{payload.tipos_lugar|length}}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Lugares</span>
+                                    <span class="fw-semibold">{{payload.lugares|length}}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Categorías</span>
+                                    <span class="fw-semibold">{{payload.categorias|length}}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Objetos</span>
+                                    <span class="fw-semibold">{{payload.objetos|length}}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Tipos objeto</span>
+                                    <span class="fw-semibold">{{payload.tipos_objeto|length}}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Objetos del lugar</span>
+                                    <span class="fw-semibold">{{payload.objetos_lugar|length}}</span>
+                                </div>
+
+                                <hr>
+
+                                <button class="btn btn-success" type="button" id="btnGuardar">Subir al sistema</button>
+
+                                <a class="btn btn-outline-secondary" href="{% url 'carga_masiva'%}">Cargar otro Excel</a>
+                            </div>
+                            {% if payload.warnings %}
+                                <hr>
+                                <div class="small text-muted mb-1">Avisos</div>
+                                <ul class="small mb-0">
+                                    {% for  w in payload.warnings %}
+                                        <li>{{ w }}</li>
+                                    {% endfor %}
+
+                                </ul>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-8">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white border-0">
+                            <strong>Editar (Antes de guardar)</strong>
+                            <div class="text-muted small">Edita en las tablas</div>
+                            <div class="card-body">
+                                <details class="mb-3" open>
+                                    <summary class="fw-semibold">Sectores</summary>
+                                    <div class="table-responsive mt-2">
+                                        <table class="table table-sm align-middle" id="tblSectores">
+                                            <thead><tr><th>#</th><th>Sector</th></tr></thead>
+                                            <tbody>
+                                                {% for s in payload.sectores %}
+                                                    <tr data-i="{{ forloop.counter0 }}">
+                                                        <td class="text-muted">{{forloop.counter}}</td>
+                                                        <td><input class="form-control form-control-sm f-sector" value="{{ s.sector }}"></td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </details>
+
+                                <details class="mb-3" open>
+                                    <summary class="fw-semibold">Ubicaciones</summary>
+                                    <div class="table-responsive mt-2">
+                                        <table class="table table-sm align-middle" id="tblUbicaciones">
+                                            <thead><tr><th>#</th><th>Ubicación</th><th>Sector</th></tr></thead>
+                                            <tbody>
+                                                {% for u in payload.ubicaciones %}
+                                                    <tr data-i="{{ forloop.counter0 }}">
+                                                        <td class="text-muted">{{forloop.counter}}</td>
+                                                        <td><input class="form-control form-control-sm f-ubicacion" value="{{ u.ubicacion }}"></td>
+                                                        <td><input class="form-control form-control-sm f-sector" value="{{ u.sector }}"></td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </details>
+
+                                <details class="mb-3" open>
+                                    <summary class="fw-semibold">Pisos</summary>
+                                    <div class="table-responsive mt-2">
+                                        <table class="table table-sm align-middle" id="tblPisos">
+                                            <thead><tr><th>#</th><th>Piso</th> <th>Ubicación</th></tr></thead>
+                                            <tbody>
+                                                {% for p in payload.pisos %}
+                                                    <tr data-i="{{ forloop.counter0 }}">
+                                                        <td class="text-muted">{{forloop.counter}}</td>
+                                                        <td><input class="form-control form-control-sm f-piso" value="{{ p.piso }}"></td>
+                                                        <td><input class="form-control form-control-sm f-ubicacion" value="{{ p.ubicacion }}"></td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </details>
+
+
+                                <details class="mb-3" open>
+                                    <summary class="fw-semibold">Tipos de lugar</summary>
+                                    <div class="table-responsive mt-2">
+                                        <table class="table table-sm align-middle" id="tblTiposLugar">
+                                            <thead><tr><th>#</th><th>Tipo de lugar</th></tr></thead>
+                                            <tbody>
+                                                {% for tl in payload.tipos_lugar %}
+                                                    <tr data-i="{{ forloop.counter0 }}">
+                                                        <td class="text-muted">{{forloop.counter}}</td>
+                                                        <td><input class="form-control form-control-sm f-tipo_lugar" value="{{ tl.tipo_de_lugar }}"></td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </details>
+
+
+                                <details class="mb-3" open>
+                                    <summary class="fw-semibold">Lugares</summary>
+                                    <div class="table-responsive mt-2">
+                                        <table class="table table-sm align-middle" id="tblLugares">
+                                            <thead><tr><th>#</th><th>Nombre Lugar</th> <th>Ubicación</th> <th>Piso</th> <th>Tipo Lugar</th></tr></thead>
+                                            <tbody>
+                                                {% for l in payload.lugares %}
+                                                    <tr data-i="{{ forloop.counter0 }}">
+                                                        <td class="text-muted">{{forloop.counter}}</td>
+                                                        <td><input class="form-control form-control-sm f-lugar" value="{{ l.nombre_del_lugar }}"></td>
+                                                        <td><input class="form-control form-control-sm f-ubicacion" value="{{ l.ubicacion }}"></td>
+                                                        <td><input class="form-control form-control-sm f-piso" value="{{ l.piso }}"></td>
+                                                        <td><input class="form-control form-control-sm f-tipo_lugar" value="{{ l.tipo_de_lugar }}"></td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </details>
+
+                                <details class="mb-3" open>
+                                    <summary class="fw-semibold">Categorías</summary>
+                                    <div class="table-responsive mt-2">
+                                        <table class="table table-sm align-middle" id="tblCategorias">
+                                            <thead><tr><th>#</th><th>Categoría</th></tr></thead>
+                                            <tbody>
+                                                {% for c in payload.categorias %}
+                                                    <tr data-i="{{ forloop.counter0 }}">
+                                                        <td class="text-muted">{{forloop.counter}}</td>
+                                                        <td><input class="form-control form-control-sm f-categoria" value="{{ c.nombre_de_categoria }}"></td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </details>
+
+                                <details class="mb-3" open>
+                                    <summary class="fw-semibold">Objetos</summary>
+                                    <div class="table-responsive mt-2">
+                                        <table class="table table-sm align-middle" id="tblObjetos">
+                                            <thead><tr><th>#</th><th>Objeto</th> <th>Categoría</th></tr></thead>
+                                            <tbody>
+                                                {% for o in payload.objetos %}
+                                                    <tr data-i="{{ forloop.counter0 }}">
+                                                        <td class="text-muted">{{forloop.counter}}</td>
+                                                        <td><input class="form-control form-control-sm f-objeto" value="{{ o.nombre_del_objeto }}"></td>
+                                                        <td><input class="form-control form-control-sm f-categoria" value="{{ o.categoria }}"></td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </details>
+
+
+                                <details class="mb-3" open>
+                                    <summary class="fw-semibold">Tipos de objeto</summary>
+                                    <div class="table-responsive mt-2">
+                                        <table class="table table-sm align-middle" id="tblTiposObjeto">
+                                            <thead><tr><th>#</th><th>Objeto</th> <th>Marca</th> <th>Material</th></tr></thead>
+                                            <tbody>
+                                                {% for t in payload.tipos_objeto %}
+                                                    <tr data-i="{{ forloop.counter0 }}">
+                                                        <td class="text-muted">{{forloop.counter}}</td>
+                                                        <td><input class="form-control form-control-sm f-objeto" value="{{ t.objeto }}"></td>
+                                                        <td><input class="form-control form-control-sm f-marca" value="{{ t.marca }}"></td>
+                                                        <td><input class="form-control form-control-sm f-material" value="{{ t.material }}"></td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </details>
+
+
+                                <details class="mb-3" open>
+                                    <summary class="fw-semibold">Objetos del lugar</summary>
+                                    <div class="table-responsive mt-2">
+                                        <table class="table table-sm align-middle" id="tblObjetosLugar">
+                                            <thead><tr><th>#</th><th>Sector</th> <th>Ubicación</th> <th>Piso</th><th>Tipo Lugar</th> <th>Lugar</th> 
+                                                    <th>Categoría</th> <th>Objeto</th> <th>Marca</th> <th>Material</th> <th>Cant.</th> <th>Estado</th> <th>Detalle</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for r in payload.objetos_lugar %}
+                                                    <tr data-i="{{ forloop.counter0 }}">
+                                                        <td class="text-muted">{{forloop.counter}}</td>
+                                                        <td><input class="form-control form-control-sm f-sector" value="{{ r.sector }}"></td>
+                                                        <td><input class="form-control form-control-sm f-ubicacion" value="{{ r.ubicacion }}"></td>
+                                                        <td><input class="form-control form-control-sm f-piso" value="{{ r.piso }}"></td>
+                                                        <td><input class="form-control form-control-sm f-tipo_lugar" value="{{ r.tipo_de_lugar }}"></td>
+                                                        <td><input class="form-control form-control-sm f-lugar" value="{{ r.lugar }}"></td>
+                                                        <td><input class="form-control form-control-sm f-categoria" value="{{ r.categoria }}"></td>
+                                                        <td><input class="form-control form-control-sm f-objeto" value="{{ r.objeto }}"></td>
+                                                        <td><input class="form-control form-control-sm f-marca" value="{{ r.marca }}"></td>
+                                                        <td><input class="form-control form-control-sm f-material" value="{{ r.material }}"></td>
+                                                        <td><input class="form-control form-control-sm f-cantidad" value="{{ r.cantidad }}"></td>
+                                                        <td><input class="form-control form-control-sm f-estado" value="{{ r.estado }}"></td>
+                                                        <td><input class="form-control form-control-sm f-detalle" value="{{ r.detalle }}"></td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </details>
+
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+        {% endif %}
+
+        {% if step == "done" %}
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-0">
+                    <strong>Exportación completa y guardada</strong>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-12 col-md-6">
+                            <div class="d-flex justify-content-between">
+                                <span>Sectores Creados</span>
+                                <span class="fw-semibold">{{ created.sectores }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Ubicaciones Creadas</span>
+                                <span class="fw-semibold">{{ created.ubicaciones }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Pisos Creados</span>
+                                <span class="fw-semibold">{{ created.pisos }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Tipos lugar creados</span>
+                                <span class="fw-semibold">{{ created.tipos_lugar }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Sectores Creados</span>
+                                <span class="fw-semibold">{{ created.sectores }}</span>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="d-flex justify-content-between">
+                                    <span>Lugares Creados</span>
+                                    <span class="fw-semibold">{{ created.lugares }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Categorías Creadas</span>
+                                    <span class="fw-semibold">{{ created.categorias }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Objetos Creados</span>
+                                    <span class="fw-semibold">{{ created.objetos }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Tipos objeto Creados</span>
+                                    <span class="fw-semibold">{{ created.tipos_objeto }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="d-flex gap-2">
+                            <a class="btn btn-primary" href="{% url 'carga_masiva' %}">Nueva Carga</a>
+                            <a class="btn btn-outline-secondary" href="{% url 'resumen_general' %}">Ir a resumen</a>
+                        </div>
+
+                        <div class="mt-3">
+                            <div class="d-flex justify-content-between">
+                                <span>Objetos del lugar insertados</span>
+                                <span class="fw-semibold">{{created.objetos_lugar}}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+
+<script>
+(function(){
+    const btn = document.getElementById("btnGuardar");
+    const ta = document.getElementById("payload_json");
+    const form = document.getElementById("formCommit");
+
+    if(!btn || !ta || !form) return ;
+
+    function rowsToList(tableId, mapper){
+        const tbl = document.getElementById(tableId);
+        if (!tbl) return [];
+        const trs = tbl.querySelectorAll("tbodytr");
+        const out = [];
+        trs.forEach(tr => out.push(mapper(tr)));
+        return out;
+    }
+    function val(tr, sel){
+        const el = tr.querySelector(sel);
+        return el ? (el.value ?? "").toString().trim() : "";
+    }
+    btn.addEventListener("click", () => {
+        const payload = {};
+        payload.sectores = rowsToList("tblSectores", (tr) => ({
+            sector: val(tr, ".f-sector"),
+        })).filter(x => x.sector);
+
+        payload.ubicaciones = rowsToList("tblUbicaciones", (tr) => ({
+            ubicacion: val(tr, ".f-ubicacion"),
+            sector: val(tr, ".f-sector"),
+        })).filter(x => x.ubicacion && x.sector);
+
+        payload.pisos= rowsToList("tblPisos", (tr) => ({
+            piso: val(tr, ".f-piso"),
+            ubicacion: val(tr, ".f-ubicacion"),
+        })).filter(x => x.tipo_de_lugar);
+
+        payload.tipos_lugar = rowsToList("tblTiposLugar", (tr => ({
+            tipo_de_lugar: val
+        })))
+    })
+})
+</script>
+
+{% endblock %}

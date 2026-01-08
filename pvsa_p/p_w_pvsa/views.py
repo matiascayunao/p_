@@ -1,4 +1,5 @@
 import json
+import unicodedata
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
@@ -9,7 +10,8 @@ from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from .excel_utils import build_excel_sectores
 from django.db.models import Sum, Q, Case, When, IntegerField, F, Value
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
+
 
 from .forms import (
     CrearSector, CrearUbicacion, CrearPiso, CrearLugar,
@@ -18,7 +20,7 @@ from .forms import (
     EditarSector, EditarUbicacion, EditarPiso, EditarLugar,
     EditarTipoLugar, EditarCategoria, EditarObjeto,
     EditarTipoObjeto, EditarObjetoLugar, EditarHistorico,
-    EstructuraCompletaForm, ObjetoLugarFilaFormSet, 
+    EstructuraCompletaForm, ObjetoLugarFilaFormSet, UploadExcelForm
 )
 
 from .models import (
@@ -27,6 +29,8 @@ from .models import (
     ObjetoLugar, HistoricoObjeto, TipoLugarObjetoTipico,
     AreaMapa
 )
+
+import openpyxl
 
 # -------------------
 # AUTH
@@ -2437,3 +2441,110 @@ def mapa_admin(request):
         "mapa_geojson": construir_geojson_para_mapa(),
     }
     return render(request, "mapa/mapa_admin.html", context)
+
+
+def _norm_header(s):
+    s = "" if s is None else str(s)
+    s = s.strip().lower()
+    s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+    s = s.replace(" ", "_").replace("-","_")
+    s = "".join(ch for ch in s if ch.isalnum() or ch == "_")
+    return s
+
+HEADER_MAP = {
+    "sector":"sector",
+    "nombre_sector": "sector",
+
+    "ubicacion": "ubicacion",
+    "nombre_ubicacion": "ubicacion",
+
+    "piso": "piso",
+    "numero_piso": "piso",
+
+    "lugar": "lugar",
+    "nombre_lugar": "lugar",
+    "nombre_del_lugar": "lugar",
+
+    "tipo_lugar": "tipo_lugar",
+    "tipo_de_lugar": "tipo_lugar",
+    "tipo_del_lugar": "tipo_lugar",
+
+    "categoria": "categoria",
+    "categoria_objeto": "categoria",
+    "nombre_de_categoria": "categoria",
+
+    "objeto": "objeto",
+    "nombre_objeto":"objeto",
+    "nombre_del_objeto":"objeto",
+
+    "marca":"marca",
+    "material": "material",
+
+    "cantidad":"cantidad",
+    "estado": "estado",
+    "detalle": "detalle",
+
+}
+
+REQUIRED_KEYS = {
+    "sector","ubicacion","piso","lugar","tipo_lugar","categoria","objeto","cantidad","estado"
+}
+
+def _to_int(v):
+    if v is None:
+        return None
+    s = str(v).strip()
+    if not s:
+        return None
+    try:
+        return int(float(s))
+    except Exception:
+        return None
+    
+def _to_estado(v):
+    if v is None:
+        return None
+    s = str(v).strip().lower()
+    if s in ("b", "bueno","ok"):
+        return "B"
+    if s in ("p", "pendiente"):
+        return "P"
+    if s in ("m", "malo"):
+        return "M"
+    if "buen" in s:
+        return "B"
+    if "pend" in s:
+        return "P"
+    if "mal" in s:
+        return "M"
+    return None
+
+
+def _ci_get(model, field, value, extra_filters = None):
+    value = (value or  "").strip()
+    if not value:
+        return None
+    extra_filters = extra_filters or {}
+    return model.objects.filter(**{f"{field}__iexact": value}, **extra_filters).first()
+
+def _tobj_get(obj, marca, material):
+    marca = (marca or "").strip()
+    material = (material or "").strip()
+
+    q = Q(objeto=obj)
+
+    if marca =="":
+        q &= (Q(marca__isnull = True)) | Q(marca="")
+    else:
+        q &= Q(marca__iexact=marca)
+
+    if material=="":
+        q &= (Q(material__isnull = True) | Q(material=""))
+    else:
+        q &= Q(material__iexact = material)
+
+    return TipoObjeto.objects.filter(q).filter()
+
+def _parse_excel(file_obj):
+    wb = openpyxl.load_workbook(file_obj, data_only=True)
+    
