@@ -60,26 +60,19 @@
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
   function colorForPct(pct) {
-    pct = Number(pct);
-    if (!isFinite(pct)) return "#64748b";
+  if (pct === null || pct === undefined || pct === "") return "#64748b";
+  pct = Number(pct);
+  if (!isFinite(pct)) return "#64748b";
 
-    if (pct >= 65) {
-      // 65 -> verde suave, 100 -> verde intenso
-      const t = (clamp(pct, 65, 100) - 65) / 35;
-      // interpolación simple entre dos verdes
-      // 65: #86efac (claro) 100: #16a34a (intenso)
-      return mixHex("#86efac", "#16a34a", t);
-    }
-    if (pct >= 50) {
-      // 50..65 amarillo
-      // puedes hacerlo fijo amarillo:
-      return "#facc15";
-    }
-    // 0..49 rojo con intensidad
-    const t = clamp(pct, 0, 49) / 49; // 0 -> 0, 49 -> 1
-    // 0: #7f1d1d (rojo oscuro) 49: #f87171 (rojo suave)
-    return mixHex("#7f1d1d", "#f87171", t);
+  if (pct >= 65) {
+    const t = (clamp(pct, 65, 100) - 65) / 35;
+    return mixHex("#86efac", "#16a34a", t);
   }
+  if (pct >= 50) return "#facc15";
+
+  const t = clamp(pct, 0, 49) / 49;
+  return mixHex("#7f1d1d", "#f87171", t);
+}
 
   function mixHex(a, b, t) {
     const pa = hexToRgb(a), pb = hexToRgb(b);
@@ -105,10 +98,13 @@
   }
 
   function badgeForPct(pct) {
-    pct = Number(pct);
-    if (!isFinite(pct)) return { label: "Sin datos", color: "#64748b" };
-    return { label: `${pct}% Bueno`, color: colorForPct(pct) };
+  if (pct === null || pct === undefined || pct === "") {
+    return { label: "Sin datos", color: "#64748b" };
   }
+  pct = Number(pct);
+  if (!isFinite(pct)) return { label: "Sin datos", color: "#64748b" };
+  return { label: `${pct}% Bueno`, color: colorForPct(pct) };
+}
 
   // =========================
   // BBOX + LIST

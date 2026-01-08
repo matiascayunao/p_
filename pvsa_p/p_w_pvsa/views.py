@@ -2021,21 +2021,17 @@ def _feature(kind, obj, geom, extra_props=None):
     return {"type": "Feature", "geometry": geom, "properties": props}
 
 
-@login_required
-def mapa_admin(request):
-    return render(request, "mapa/mapa_admin.html",{
-        "mapa_geojson":construir_geojson_para_mapa(),}
-        
-    )
 
 
 @login_required
 def mapa_editor_crear(request):
-    return render(request, "mapa/mapa_editor.html",{
-        "mapa_geojson":construir_geojson_para_mapa(),}
-        
-    )
+    sectores = Sector.objects.all().order_by("sector")
+    ubicaciones= Ubicacion.objects.select_related("sector").all().order_by("ubicacion")
 
+    return render(request, "mapa/mapa_editor.html", {
+        "sectores": sectores,
+        "ubicaciones": ubicaciones,
+    })
 
 
 @login_required
@@ -2082,15 +2078,77 @@ def mapa_ubicacion_editar_geom(request, ubicacion_id):
 
 @login_required
 def mapa_sector_detalle(request, sector_id):
-    s = get_object_or_404(Sector, pk=sector_id)
-    return render(
-        request,
-        "mapa/mapa_sector_detalle.html",
-        {
-            "sector": s,
-            "geom": s.geom,
-        },
+    sector = get_object_or_404(Sector, pk=sector_id)
+    geom = sector.geom
+    
+
+    ubic_qs=Ubicacion.objects.select_related("sector").filter(sector_id=sector.id).exclude(geom__isnull=True)
+
+    rows = (
+        ObjetoLugar.objects.filter(lugar__isnull=False, lugar__piso__ubicacion__sector_id=sector.id).values("lugar__piso__ubicacion_id").annotate(total = Sum("cantidad"), buenas=Sum(Case(When(estado="B",then=F("cantidad")), default=Value(0),output_field=IntegerField())), pendientes=Sum(Case(When(estado="P",then=F("cantidad")), default=Value(0), output_field=IntegerField())), malas=Sum(Case(When(estado="M", then=F("cantidad")), default=Value(0), output_field=IntegerField())))
+
     )
+    stats = {}
+
+    for r in rows:
+        uid = r["lugar__piso__ubicacion_id"]
+        total = int(r["total"] or 0)
+        buenas=int(r["buenas"] or 0)
+        pendientes = int(r["pendientes"] or 0)
+        malas = int(r["malas"]or 0)
+
+        if total > 0:
+            pct_b = round((buenas * 100.0) / total , 1)
+            pct_p = round((pendientes * 100.0) / total, 1)
+            pct_m = round((malas * 100.0) / total, 1)
+            hasPct = True
+        else:
+            pct_b = pct_p = pct_m = 0.0
+            hasPct = False
+
+        stats[str(uid)] = {
+            "total": total,
+            "buenas": buenas,
+            "pendientes": pendientes,
+            "malas": malas,
+            "pct_buenas": pct_b,
+            "pct_pendientes": pct_p,
+            "pct_malas": pct_m,
+            "hasPct": hasPct
+
+        } 
+
+    ubic_features = []
+
+    for u in ubic_qs:
+        st = stats.get(str(u.id), None)
+        hasPct = bool(st and st.get("hasPct"))
+        pct = (st["pct_buenas"] if hasPct else None)
+
+        ubic_features.append({
+            "type": "Feature",
+            "geometry": u.geom,
+            "properties": {
+                "id":u.id,
+                "name": u.ubicacion,
+                "sector_name": sector.sector,
+                "hasPct": hasPct,
+                "pct": pct,
+                "total": (st["total"] if st else 0),
+                "buenas": (st["total"] if st else 0),
+                "pendientes": (st["total"] if st else 0),
+                "malas": (st["total"] if st else 0),
+                "detail_url": reverse("mapa_ubicacion_detalle", kwargs={"ubicacion_id": u.id}),
+                "edit_geom_url": reverse("mapa_ubicacion_editar_geom", kwargs={"ubicacion_id": u.id}),
+            },
+        })
+
+    ubic_fc = {"type": "FeatureCollection", "features": ubic_features}
+    return render(request, "mapa/mapa_sector_detalle.html", {
+        "sector": sector,
+        "geom": geom,
+        "ubic_fc": ubic_fc
+    })
 
 
 @login_required
@@ -2245,51 +2303,137 @@ def _color_por_pct_buenas(pct):
     return f"rgb({int(239 + 10*(1-intensidad))}, {int(68 * intensidad)}, {int(68 * intensidad)})"
 
 
-def construir_geojson_para_mapa():
-    resumen_sector = _resumen_sector_dict()
-    resumen_ubic = _resumen_ubicacion_dict()
+def _stats_sector_dict():
+    rows = (
+        ObjetoLugar.objects
+        .filter(lugar__isnull=False)
+        .values("lugar__piso__ubicacion__sector_id")
+        .annotate(
+            total=Sum("cantidad"),
+            buenas=Sum(Case(When(estado="B", then=F("cantidad")), default=Value(0), output_field=IntegerField())),
+            pendientes=Sum(Case(When(estado="P", then=F("cantidad")), default=Value(0), output_field=IntegerField())),
+            malas=Sum(Case(When(estado="M", then=F("cantidad")), default=Value(0), output_field=IntegerField())),
+        )
+    )
 
+    out = {}
+    for r in rows:
+        sid = r["lugar__piso__ubicacion__sector_id"]
+        total = int(r["total"] or 0)
+        buenas = int(r["buenas"] or 0)
+        pendientes = int(r["pendientes"] or 0)
+        malas = int(r["malas"] or 0)
+
+        if total > 0:
+            pct_b = round((buenas * 100.0) / total, 1)
+            pct_p = round((pendientes * 100.0) / total, 1)
+            pct_m = round((malas * 100.0) / total, 1)
+        else:
+            pct_b = pct_p = pct_m = 0.0
+
+        out[str(sid)] = {
+            "total": total,
+            "buenas": buenas,
+            "pendientes": pendientes,
+            "malas": malas,
+            "pct_buenas": pct_b,
+            "pct_pendientes": pct_p,
+            "pct_malas": pct_m,
+        }
+    return out
+
+
+def _stats_ubicacion_dict():
+    rows = (
+        ObjetoLugar.objects
+        .filter(lugar__isnull=False)
+        .values("lugar__piso__ubicacion_id")
+        .annotate(
+            total=Sum("cantidad"),
+            buenas=Sum(Case(When(estado="B", then=F("cantidad")), default=Value(0), output_field=IntegerField())),
+            pendientes=Sum(Case(When(estado="P", then=F("cantidad")), default=Value(0), output_field=IntegerField())),
+            malas=Sum(Case(When(estado="M", then=F("cantidad")), default=Value(0), output_field=IntegerField())),
+        )
+    )
+
+    out = {}
+    for r in rows:
+        uid = r["lugar__piso__ubicacion_id"]
+        total = int(r["total"] or 0)
+        buenas = int(r["buenas"] or 0)
+        pendientes = int(r["pendientes"] or 0)
+        malas = int(r["malas"] or 0)
+
+        if total > 0:
+            pct_b = round((buenas * 100.0) / total, 1)
+            pct_p = round((pendientes * 100.0) / total, 1)
+            pct_m = round((malas * 100.0) / total, 1)
+        else:
+            pct_b = pct_p = pct_m = 0.0
+
+        out[str(uid)] = {
+            "total": total,
+            "buenas": buenas,
+            "pendientes": pendientes,
+            "malas": malas,
+            "pct_buenas": pct_b,
+            "pct_pendientes": pct_p,
+            "pct_malas": pct_m,
+        }
+    return out
+
+
+def construir_geojson_para_mapa():
     features = []
 
-    for s in Sector.objects.exclude(geom=True).exclude(geom={}):
-        resumen = resumen_sector.get(s.id, {})
-        pct_buenas= resumen.get("pct_buenas", 0)
+    for s in Sector.objects.all():
+        if not s.geom:
+            continue
         features.append({
             "type": "Feature",
-            "geometry":s.geom,
-            "properties":{
-                "kind":"sector",
-                "id":s.id,
-                "name":s.sector,
-                "pct_buenas":pct_buenas,
-                "color": _color_por_pct_buenas(pct_buenas),
+            "geometry": s.geom,
+            "properties": {
+                "kind": "sector",
+                "id": s.id,
+                "sector_id": s.id,
+                "name": s.sector,
+                "sector_name": s.sector,
                 "detail_url": reverse("mapa_sector_detalle", kwargs={"sector_id": s.id}),
-                "edit_geom_url": reverse("mapa_sector_editar_geom",kwargs={"sector_id":s.id}), 
-
+                "edit_geom_url": reverse("mapa_sector_editar_geom", kwargs={"sector_id": s.id}),
             },
         })
-    
-    for u in Ubicacion.objects.select_related("sector").exclude(geom=True).exclude(geom={}):
-        
-        resumen = resumen_ubic.get(u.id,{})
-        pct_buenas = resumen.get("pct_buenas",0)
+
+    for u in Ubicacion.objects.select_related("sector").all():
+        if not u.geom:
+            continue
         features.append({
             "type": "Feature",
             "geometry": u.geom,
             "properties": {
-                "kind":"ubicacion",
-                "id":u.id,
-                "name":u.ubicacion,
-                "sector":u.sector.sector,
-                "pct_buenas":pct_buenas,
-                "color": _color_por_pct_buenas(pct_buenas),
-                "detail_url": reverse("mapa_ubicacion_detalle",kwargs={"ubicacion_id":u.id}),
-                "edit_geom_url":reverse("mapa_ubicacion_editar_geom",kwargs={"ubicacion_id",u.id}),
+                "kind": "ubicacion",
+                "id": u.id,
+                "sector_id": u.sector_id,
+                "sector_name": u.sector.sector,
+                "name": u.ubicacion,
+                "detail_url": reverse("mapa_ubicacion_detalle", kwargs={"ubicacion_id": u.id}),
+                "edit_geom_url": reverse("mapa_ubicacion_editar_geom", kwargs={"ubicacion_id": u.id}),
             },
-            
         })
-    
-    return {
-        "type":"FeatureCollection",
-        "features": features,
+
+    return {"type": "FeatureCollection", "features": features}
+
+
+@login_required
+def mapa_admin(request):
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse({
+            "sector": _stats_sector_dict(),
+            "ubicacion": _stats_ubicacion_dict(),
+        })
+
+    context = {
+        "sectores": Sector.objects.all().order_by("sector"),
+        "ubicaciones": Ubicacion.objects.select_related("sector").all().order_by("ubicacion"),
+        "mapa_geojson": construir_geojson_para_mapa(),
     }
+    return render(request, "mapa/mapa_admin.html", context)
