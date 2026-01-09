@@ -100,6 +100,14 @@ def _setup_outlines(ws):
     ws.sheet_format.outlineLevelRow = 2
     ws.sheet_format.outlineLevelCol = 1
 
+    # cada columna visible se colapsa INDIVIDUAL (grupos separados por columnas ocultas)
+    #ws.column_dimensions.group("A", "A", outline_level=1, hidden=False)
+    #ws.column_dimensions.group("C", "C", outline_level=2, hidden=False)
+    #ws.column_dimensions.group("E", "E", outline_level=3, hidden=False)
+    #ws.column_dimensions.group("G", "G", outline_level=4, hidden=False)
+    #ws.column_dimensions.group("I", "I", outline_level=5, hidden=False)
+    #ws.column_dimensions.group("K", "K", outline_level=6, hidden=False)
+    #ws.column_dimensions.group("M", "M", outline_level=7, hidden=False)
 
 
 def _tipo_txt(ol) -> str:
