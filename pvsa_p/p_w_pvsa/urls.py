@@ -113,7 +113,7 @@ urlpatterns = [
     path("mapa/sector/<int:sector_id>/quitar-geom/", views.mapa_sector_quitar_geom, name="mapa_sector_quitar_geom"),
     path("mapa/ubicacion/<int:ubicacion_id>/quitar-geom/", views.mapa_ubicacion_quitar_geom, name="mapa_ubicacion_quitar_geom"),
 
-    #path("carga-masiva", views.carga_masiva, name="carga_masiva"),
+    path("carga-masiva", views.carga_masiva, name="carga_masiva"),
     
 
 

@@ -1,5 +1,7 @@
 import json
+import re
 import unicodedata
+from datetime import date, datetime
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
@@ -11,6 +13,9 @@ from django.http import HttpResponse, JsonResponse
 from .excel_utils import build_excel_sectores
 from django.db.models import Sum, Q, Case, When, IntegerField, F, Value
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
+from django.contrib import messages
+from django.apps import apps
+
 
 
 from .forms import (
@@ -30,7 +35,8 @@ from .models import (
     AreaMapa
 )
 
-import openpyxl
+import openpyxl 
+from openpyxl import load_workbook
 
 # -------------------
 # AUTH
@@ -2306,6 +2312,10 @@ def _color_por_pct_buenas(pct):
     intensidad = min(max(pct / 50, 0),1)
     return f"rgb({int(239 + 10*(1-intensidad))}, {int(68 * intensidad)}, {int(68 * intensidad)})"
 
+#################################################################################################################################
+
+
+
 
 def _stats_sector_dict():
     rows = (
@@ -2443,108 +2453,519 @@ def mapa_admin(request):
     return render(request, "mapa/mapa_admin.html", context)
 
 
-def _norm_header(s):
-    s = "" if s is None else str(s)
-    s = s.strip().lower()
+# =========================
+# Helpers: parsing Excel
+# =========================
+def _norm_header(x: object) -> str:
+    if x is None:
+        return ""
+    s = str(x).strip()
     s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
-    s = s.replace(" ", "_").replace("-","_")
-    s = "".join(ch for ch in s if ch.isalnum() or ch == "_")
-    return s
+    return s.lower().replace(" ", "").replace("_", "")
 
-HEADER_MAP = {
-    "sector":"sector",
-    "nombre_sector": "sector",
 
+def _clean_text(x: object) -> str:
+    if x is None:
+        return ""
+    s = str(x).strip()
+    return "" if s == "-" else s
+
+
+HEADER_ALIASES = {
     "ubicacion": "ubicacion",
-    "nombre_ubicacion": "ubicacion",
-
+    "ubicación": "ubicacion",
+    "sector": "sector",
     "piso": "piso",
-    "numero_piso": "piso",
-
+    "tipodelugar": "tipo_de_lugar",
+    "tipolugar": "tipo_de_lugar",
+    "tipo_de_lugar": "tipo_de_lugar",
     "lugar": "lugar",
-    "nombre_lugar": "lugar",
-    "nombre_del_lugar": "lugar",
-
-    "tipo_lugar": "tipo_lugar",
-    "tipo_de_lugar": "tipo_lugar",
-    "tipo_del_lugar": "tipo_lugar",
-
     "categoria": "categoria",
-    "categoria_objeto": "categoria",
-    "nombre_de_categoria": "categoria",
-
+    "categoría": "categoria",
     "objeto": "objeto",
-    "nombre_objeto":"objeto",
-    "nombre_del_objeto":"objeto",
-
-    "marca":"marca",
+    "tipo": "tipo_objeto",
+    "tipoobjeto": "tipo_objeto",
+    "tipo_objeto": "tipo_objeto",
+    "marca": "marca",
     "material": "material",
-
-    "cantidad":"cantidad",
+    "cantidad": "cantidad",
     "estado": "estado",
     "detalle": "detalle",
-
+    "especificacion": "detalle",
+    "especificación": "detalle",
+    "fecha": "fecha",
 }
 
-REQUIRED_KEYS = {
-    "sector","ubicacion","piso","lugar","tipo_lugar","categoria","objeto","cantidad","estado"
-}
+# Para reconocer el formato normalizado (tu plantilla)
+REQUIRED_HEADERS_NORMALIZADO = {"ubicacion", "sector", "lugar", "cantidad", "estado"}
 
-def _to_int(v):
-    if v is None:
-        return None
-    s = str(v).strip()
-    if not s:
-        return None
+# Para reconocer el formato exportado por TU sistema (tu Excel real)
+RE_SECTOR_UBI = re.compile(r"sector:\s*(.*?)\s*\|\s*ubicaci[oó]n:\s*(.*)", re.IGNORECASE)
+
+
+def _parse_normalizado(wb):
+    """
+    Busca una hoja tipo 'ObjetosLugar' (o la primera) que tenga encabezados:
+    ubicacion, sector, lugar, cantidad, estado (y ojalá piso/objeto/tipo_objeto/etc.)
+    """
+    ws = wb["ObjetosLugar"] if "ObjetosLugar" in wb.sheetnames else wb.worksheets[0]
+
+    header_row = None
+    header_map = {}
+
+    for r in range(1, min(ws.max_row, 30) + 1):
+        mapped = []
+        for c in range(1, ws.max_column + 1):
+            key = HEADER_ALIASES.get(_norm_header(ws.cell(r, c).value))
+            if key:
+                mapped.append((c, key))
+
+        keys = set(k for _, k in mapped)
+        if REQUIRED_HEADERS_NORMALIZADO.issubset(keys):
+            header_row = r
+            header_map = {col: key for col, key in mapped}
+            break
+
+    if not header_row:
+        return []
+
+    rows = []
+    for r in range(header_row + 1, ws.max_row + 1):
+        # saltar filas vacías
+        if not any(ws.cell(r, c).value not in (None, "") for c in range(1, ws.max_column + 1)):
+            continue
+
+        rec = {}
+        for col, key in header_map.items():
+            rec[key] = ws.cell(r, col).value
+
+        rows.append(
+            {
+                "ubicacion": _clean_text(rec.get("ubicacion")),
+                "sector": _clean_text(rec.get("sector")),
+                "piso": _clean_text(rec.get("piso")),
+                "tipo_de_lugar": _clean_text(rec.get("tipo_de_lugar")) or "Sin especificar",
+                "lugar": _clean_text(rec.get("lugar")),
+                "categoria": _clean_text(rec.get("categoria")) or "Sin categoría",
+                "objeto": _clean_text(rec.get("objeto")),
+                "tipo_objeto": _clean_text(rec.get("tipo_objeto")),
+                "marca": _clean_text(rec.get("marca")),
+                "material": _clean_text(rec.get("material")),
+                "cantidad": rec.get("cantidad") if rec.get("cantidad") is not None else 0,
+                "estado": _clean_text(rec.get("estado")),
+                "detalle": _clean_text(rec.get("detalle")),
+            }
+        )
+
+    return rows
+
+
+def _parse_exportado(wb):
+    """
+    Parsea el Excel exportado por tu sistema:
+    - Primera fila tipo: "Sector: X | Ubicación: Y"
+    - Luego "PISO 1", "PISO 2", ...
+    - Luego: (Nombre Lugar) + fila siguiente con encabezado "Objeto | Tipo | Cantidad | Estado | Detalle | Fecha"
+    """
+    rows = []
+
+    for sheet in wb.worksheets:
+        sector = None
+        ubicacion = None
+
+        # Buscar la línea "Sector: ... | Ubicación: ..."
+        for r in range(1, 12):
+            v = sheet.cell(r, 1).value
+            if not v:
+                continue
+            m = RE_SECTOR_UBI.search(str(v))
+            if m:
+                sector = m.group(1).strip()
+                ubicacion = m.group(2).strip()
+                break
+
+        if not sector or not ubicacion:
+            continue
+
+        current_piso = ""
+        r = 1
+        max_r = sheet.max_row
+
+        while r <= max_r:
+            a = sheet.cell(r, 1).value
+
+            # Detectar "PISO X"
+            if a:
+                txt = str(a).strip()
+                if _norm_header(txt).startswith("piso"):
+                    current_piso = txt
+
+            # Detectar inicio de bloque de lugar:
+            # fila r = nombre lugar
+            # fila r+1 col1 = "Objeto"
+            if a and sheet.cell(r + 1, 1).value and _norm_header(sheet.cell(r + 1, 1).value) == "objeto":
+                lugar = str(a).strip()
+
+                # datos comienzan en r+2
+                rr = r + 2
+                while rr <= max_r:
+                    obj = sheet.cell(rr, 1).value
+                    if obj is None or str(obj).strip() == "":
+                        break
+
+                    tipo = sheet.cell(rr, 2).value
+                    cantidad = sheet.cell(rr, 3).value
+                    estado = sheet.cell(rr, 4).value
+                    detalle = sheet.cell(rr, 5).value
+                    # fecha = sheet.cell(rr, 6).value  # si quieres usarla después
+
+                    rows.append(
+                        {
+                            "ubicacion": ubicacion,
+                            "sector": sector,
+                            "piso": current_piso,
+                            "tipo_de_lugar": "Sin especificar",   # en tu export no viene
+                            "lugar": lugar,
+                            "categoria": "Sin categoría",         # en tu export no viene
+                            "objeto": _clean_text(obj),
+                            "tipo_objeto": _clean_text(tipo),
+                            "cantidad": cantidad if cantidad is not None else 0,
+                            "estado": _clean_text(estado),
+                            "detalle": _clean_text(detalle),
+                        }
+                    )
+                    rr += 1
+
+                r = rr
+                continue
+
+            r += 1
+
+    return rows
+
+
+def parse_excel(file_obj):
+    file_obj.seek(0)
+    wb = load_workbook(file_obj, data_only=True)
+
+    rows = _parse_normalizado(wb)
+    if rows:
+        return rows, "normalizado"
+
+    rows = _parse_exportado(wb)
+    if rows:
+        return rows, "exportado"
+
+    raise ValueError(
+        "No pude reconocer el formato del Excel. "
+        "Acepto: (1) plantilla normalizada con columnas ubicacion/sector/lugar/cantidad/estado, "
+        "o (2) el Excel exportado por tu sistema (Sector|Ubicación, PISO, y tabla Objeto/Tipo/Cantidad...)."
+    )
+
+
+def _split_tipo(tipo_str: str):
+    """
+    Convierte 'Marca - Material' a (marca, material)
+    """
+    tipo_str = (tipo_str or "").strip()
+    if " - " in tipo_str:
+        marca, material = [x.strip() for x in tipo_str.split(" - ", 1)]
+        return marca, material
+    if "-" in tipo_str:
+        marca, material = [x.strip() for x in tipo_str.split("-", 1)]
+        return marca, material
+    return tipo_str, ""
+
+
+APP_LABEL = Ubicacion._meta.app_label
+
+
+def _get_model(name: str):
     try:
-        return int(float(s))
-    except Exception:
+        return apps.get_model(APP_LABEL, name)
+    except LookupError:
         return None
-    
-def _to_estado(v):
-    if v is None:
+
+
+def _field_names(model):
+    return {f.name for f in model._meta.get_fields()}
+
+
+def _pick_field(model, candidates, required=True):
+    fields = _field_names(model)
+    for c in candidates:
+        if c in fields:
+            return c
+    if not required:
         return None
-    s = str(v).strip().lower()
-    if s in ("b", "bueno","ok"):
+    raise RuntimeError(f"En {model.__name__} no encontré ninguno de estos campos: {candidates}")
+
+
+def _pick_fk(model, related_model, candidates=None, required=True):
+    # 1) probar por nombre conocido
+    if candidates:
+        for c in candidates:
+            try:
+                f = model._meta.get_field(c)
+                if getattr(f, "remote_field", None) and f.remote_field.model == related_model:
+                    return c
+            except Exception:
+                pass
+
+    # 2) buscar el primer FK que apunte a related_model
+    for f in model._meta.get_fields():
+        if getattr(f, "many_to_one", False) and getattr(f, "remote_field", None):
+            if f.remote_field.model == related_model:
+                return f.name
+
+    if not required:
+        return None
+
+    raise RuntimeError(f"No encontré FK desde {model.__name__} hacia {related_model.__name__}")
+
+
+def import_from_rows(rows):
+    """
+    Importa filas del payload y crea/actualiza según TU esquema real:
+    Sector -> Ubicacion(FK Sector) -> Piso(FK Ubicacion) -> TipoLugar -> Lugar(FK Piso + FK TipoLugar)
+    CategoriaObjeto -> Objeto(FK Categoria) -> TipoObjeto -> ObjetoLugar
+    """
+    import re
+    from django.db import transaction
+
+    def _piso_to_int(piso_raw: str) -> int:
+        s = (piso_raw or "").strip()
+        m = re.search(r"(\d+)", s)
+        return int(m.group(1)) if m else 0
+
+    def _estado_to_code(estado_raw: str) -> str:
+        s = (estado_raw or "").strip().lower()
+        if s in ("b", "bueno"):
+            return "B"
+        if s in ("p", "pendiente"):
+            return "P"
+        if s in ("m", "malo"):
+            return "M"
+        # si viene vacío o raro, por defecto Bueno
         return "B"
-    if s in ("p", "pendiente"):
-        return "P"
-    if s in ("m", "malo"):
-        return "M"
-    if "buen" in s:
-        return "B"
-    if "pend" in s:
-        return "P"
-    if "mal" in s:
-        return "M"
-    return None
+
+    def key(x):
+        return (x or "").strip().lower()
+
+    created_ol = 0
+    updated_ol = 0
+
+    # caches
+    cache_sector = {}
+    cache_ubic = {}
+    cache_piso = {}
+    cache_tl = {}
+    cache_lugar = {}
+    cache_cat = {}
+    cache_obj = {}
+    cache_tipo = {}
+
+    with transaction.atomic():
+        for r in rows:
+            ubicacion = _clean_text(r.get("ubicacion"))
+            sector = _clean_text(r.get("sector"))
+            piso_raw = _clean_text(r.get("piso"))
+            tipo_de_lugar = _clean_text(r.get("tipo_de_lugar")) or "Sin especificar"
+            lugar = _clean_text(r.get("lugar"))
+
+            categoria = _clean_text(r.get("categoria")) or "Sin categoría"
+            objeto = _clean_text(r.get("objeto"))
+            tipo_objeto_str = _clean_text(r.get("tipo_objeto"))
+            detalle = _clean_text(r.get("detalle"))
+            estado = _estado_to_code(r.get("estado"))
+
+            try:
+                cantidad = int(float(r.get("cantidad") or 0))
+            except Exception:
+                cantidad = 0
+
+            # mínimos
+            if not (ubicacion and sector and lugar and objeto):
+                continue
+
+            # -------- Sector --------
+            ks = key(sector)
+            if ks in cache_sector:
+                sec_obj = cache_sector[ks]
+            else:
+                sec_obj, _ = Sector.objects.get_or_create(sector=sector)
+                cache_sector[ks] = sec_obj
+
+            # -------- Ubicacion (FK a Sector) --------
+            कु = (key(ubicacion), sec_obj.id)
+            if कु in cache_ubic:
+                ubi_obj = cache_ubic[कु]
+            else:
+                ubi_obj, _ = Ubicacion.objects.get_or_create(
+                    ubicacion=ubicacion,
+                    sector=sec_obj,
+                )
+                cache_ubic[कु] = ubi_obj
+
+            # -------- Piso (FK a Ubicacion) --------
+            piso_int = _piso_to_int(piso_raw)
+            kp = (piso_int, ubi_obj.id)
+            if kp in cache_piso:
+                piso_obj = cache_piso[kp]
+            else:
+                piso_obj, _ = Piso.objects.get_or_create(
+                    piso=piso_int,
+                    ubicacion=ubi_obj,
+                )
+                cache_piso[kp] = piso_obj
+
+            # -------- TipoLugar --------
+            ktl = key(tipo_de_lugar)
+            if ktl in cache_tl:
+                tl_obj = cache_tl[ktl]
+            else:
+                tl_obj, _ = TipoLugar.objects.get_or_create(tipo_de_lugar=tipo_de_lugar)
+                cache_tl[ktl] = tl_obj
+
+            # -------- Lugar (FK Piso + TipoLugar) --------
+            kl = (key(lugar), piso_obj.id, tl_obj.id)
+            if kl in cache_lugar:
+                lug_obj = cache_lugar[kl]
+            else:
+                lug_obj, _ = Lugar.objects.get_or_create(
+                    nombre_del_lugar=lugar,
+                    piso=piso_obj,
+                    lugar_tipo_lugar=tl_obj,
+                )
+                cache_lugar[kl] = lug_obj
+
+            # -------- CategoriaObjeto --------
+            kc = key(categoria)
+            if kc in cache_cat:
+                cat_obj = cache_cat[kc]
+            else:
+                cat_obj, _ = CategoriaObjeto.objects.get_or_create(
+                    nombre_de_categoria=categoria
+                )
+                cache_cat[kc] = cat_obj
+
+            # -------- Objeto (FK a Categoria por defecto) --------
+            ko = (key(objeto), cat_obj.id)
+            if ko in cache_obj:
+                obj_obj = cache_obj[ko]
+            else:
+                obj_obj, _ = Objeto.objects.get_or_create(
+                    nombre_del_objeto=objeto,
+                    defaults={"objeto_categoria": cat_obj},
+                )
+                cache_obj[ko] = obj_obj
+
+            # -------- TipoObjeto --------
+            marca, material = _split_tipo(tipo_objeto_str)
+            kt = (obj_obj.id, key(marca), key(material))
+            if kt in cache_tipo:
+                tipo_obj = cache_tipo[kt]
+            else:
+                tipo_obj, _ = TipoObjeto.objects.get_or_create(
+                    objeto=obj_obj,
+                    marca=marca,
+                    material=material,
+                )
+                cache_tipo[kt] = tipo_obj
+
+            # -------- ObjetoLugar (update_or_create) --------
+            ol_obj, created = ObjetoLugar.objects.update_or_create(
+                lugar=lug_obj,
+                tipo_de_objeto=tipo_obj,
+                defaults={
+                    "cantidad": cantidad,
+                    "estado": estado,
+                    "detalle": detalle,
+                },
+            )
+
+            if created:
+                created_ol += 1
+            else:
+                updated_ol += 1
+
+    return {"created": created_ol, "updated": updated_ol}
 
 
-def _ci_get(model, field, value, extra_filters = None):
-    value = (value or  "").strip()
-    if not value:
-        return None
-    extra_filters = extra_filters or {}
-    return model.objects.filter(**{f"{field}__iexact": value}, **extra_filters).first()
+# =========================
+# Vista
+# =========================
+@require_http_methods(["GET", "POST"])
+def carga_masiva(request):
+    # GET -> pantalla upload
+    if request.method == "GET":
+        return render(request, "excel/carga_masiva.html", {"step": "upload"})
 
-def _tobj_get(obj, marca, material):
-    marca = (marca or "").strip()
-    material = (material or "").strip()
+    # POST (guardar)
+    if request.POST.get("payload_json"):
+        try:
+            raw = json.loads(request.POST["payload_json"])
+            rows = raw.get("objetos_lugar", [])
+            result = import_from_rows(rows)
+            messages.success(
+                request,
+                f"Importación OK. Creados: {result['created']} | Actualizados: {result['updated']}"
+            )
+            return redirect("carga_masiva")
+        except Exception as e:
+            return render(
+                request,
+                "excel/carga_masiva.html",
+                {
+                    "step": "preview",
+                    "error": str(e),
+                    "payload": raw if isinstance(raw, dict) else {"objetos_lugar": []},
+                    "detected": "manual",
+                },
+            )
 
-    q = Q(objeto=obj)
+    # POST (subir archivo y previsualizar)
+    file_obj = request.FILES.get("archivo")
+    if not file_obj:
+        return render(
+            request,
+            "excel/carga_masiva.html",
+            {"step": "upload", "error": "Selecciona un archivo Excel (.xlsx)."},
+        )
 
-    if marca =="":
-        q &= (Q(marca__isnull = True)) | Q(marca="")
-    else:
-        q &= Q(marca__iexact=marca)
+    try:
+        rows, detected = parse_excel(file_obj)
 
-    if material=="":
-        q &= (Q(material__isnull = True) | Q(material=""))
-    else:
-        q &= Q(material__iexact = material)
+        # Asegurar defaults mínimos para que SIEMPRE previsualice e importe
+        normalized_rows = []
+        for r in rows:
+            normalized_rows.append(
+                {
+                    "ubicacion": _clean_text(r.get("ubicacion")),
+                    "sector": _clean_text(r.get("sector")),
+                    "piso": _clean_text(r.get("piso")),
+                    "tipo_de_lugar": _clean_text(r.get("tipo_de_lugar")) or "Sin especificar",
+                    "lugar": _clean_text(r.get("lugar")),
+                    "categoria": _clean_text(r.get("categoria")) or "Sin categoría",
+                    "objeto": _clean_text(r.get("objeto")),
+                    "tipo_objeto": _clean_text(r.get("tipo_objeto")),
+                    "cantidad": r.get("cantidad") if r.get("cantidad") is not None else 0,
+                    "estado": _clean_text(r.get("estado")),
+                    "detalle": _clean_text(r.get("detalle")),
+                }
+            )
 
-    return TipoObjeto.objects.filter(q).filter()
+        payload = {"objetos_lugar": normalized_rows}
 
-def _parse_excel(file_obj):
-    wb = openpyxl.load_workbook(file_obj, data_only=True)
-    
+        return render(
+            request,
+            "excel/carga_masiva.html",
+            {"step": "preview", "payload": payload, "detected": detected},
+        )
+
+    except Exception as e:
+        return render(
+            request,
+            "excel/carga_masiva.html",
+            {"step": "upload", "error": str(e)},
+        )
