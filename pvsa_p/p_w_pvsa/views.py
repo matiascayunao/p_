@@ -44,11 +44,11 @@ from openpyxl import load_workbook
 
 @login_required
 def descargar_excel_sectores(request):
-    ubicaciones = (Ubicacion.objects.select_related("sector").order_by("sector__sector","ubicacion"))
+    ubicaciones = Ubicacion.objects.select_related("sector").order_by("sector__sector","ubicacion")
     xlsx_bytes = build_excel_sectores(ubicaciones)
 
-    response = HttpResponse(xlsx_bytes, content_type="application/vnd.openxmlformats-officedocument.""spreadsheetml.sheet")
-    response["Content-Disposition"]= 'attachment; filename= "SECTORES.xlsx"'
+    response = HttpResponse(xlsx_bytes, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"]= 'attachment; filename= "PUERTO.xlsx"'
     return response
 
 @login_required
