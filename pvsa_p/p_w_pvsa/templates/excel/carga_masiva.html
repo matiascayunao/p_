@@ -76,7 +76,6 @@
       <div class="card-body p-4 p-md-5">
         <div class="d-flex align-items-start gap-3 mb-3">
           <div class="iconwrap">
-            <!-- simple inline icon -->
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M12 3v10m0-10 4 4m-4-4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -152,6 +151,20 @@
               <input id="tableFilter" type="text" class="form-control" placeholder="Filtrar filas (ubicación, sector, objeto, etc.)">
             </div>
 
+            <!-- ✅ Columnas colapsables (individual) -->
+            <div class="dropdown">
+              <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                Columnas
+              </button>
+              <div class="dropdown-menu p-3 shadow-sm" style="min-width: 280px;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="fw-semibold small">Mostrar / Ocultar</div>
+                  <button type="button" class="btn btn-sm btn-link p-0" id="colsShowAll">Mostrar todo</button>
+                </div>
+                <div class="d-grid gap-2" id="colsList"></div>
+              </div>
+            </div>
+
             <div class="text-muted small">
               Mostrando: <span id="rowsShown">0</span> / {{ payload.objetos_lugar|length }}
             </div>
@@ -167,59 +180,59 @@
               <table class="table table-hover align-middle mb-0" id="tablaObjetosLugar">
                 <thead class="table-light sticky-top">
                   <tr>
-                    <th class="th-min">Ubicación</th>
-                    <th class="th-min">Sector</th>
-                    <th class="th-min">Piso</th>
-                    <th class="th-med">Tipo de lugar</th>
-                    <th class="th-med">Lugar</th>
-                    <th class="th-med">Categoría</th>
-                    <th class="th-med">Objeto</th>
-                    <th class="th-med">Tipo</th>
-                    <th class="th-xs text-center">Cantidad</th>
-                    <th class="th-sm">Estado</th>
-                    <th class="th-lg">Detalle</th>
+                    <th class="th-min" data-col="ubicacion">Ubicación</th>
+                    <th class="th-min" data-col="sector">Sector</th>
+                    <th class="th-min" data-col="piso">Piso</th>
+                    <th class="th-med" data-col="tipo_de_lugar">Tipo de lugar</th>
+                    <th class="th-med" data-col="lugar">Lugar</th>
+                    <th class="th-med" data-col="categoria">Categoría</th>
+                    <th class="th-med" data-col="objeto">Objeto</th>
+                    <th class="th-med" data-col="tipo_objeto">Tipo</th>
+                    <th class="th-xs text-center" data-col="cantidad">Cantidad</th>
+                    <th class="th-sm" data-col="estado">Estado</th>
+                    <th class="th-lg" data-col="detalle">Detalle</th>
                   </tr>
                 </thead>
                 <tbody>
                   {% for r in payload.objetos_lugar %}
                     <tr class="rowedit">
-                      <td>
+                      <td data-col="ubicacion">
                         <input class="form-control form-control-sm inputflat" data-k="ubicacion"
                                value="{{ r.ubicacion|default_if_none:'' }}">
                       </td>
-                      <td>
+                      <td data-col="sector">
                         <input class="form-control form-control-sm inputflat" data-k="sector"
                                value="{{ r.sector|default_if_none:'' }}">
                       </td>
-                      <td>
+                      <td data-col="piso">
                         <input class="form-control form-control-sm inputflat" data-k="piso"
                                value="{{ r.piso|default_if_none:'' }}">
                       </td>
-                      <td>
+                      <td data-col="tipo_de_lugar">
                         <input class="form-control form-control-sm inputflat" data-k="tipo_de_lugar"
                                value="{{ r.tipo_de_lugar|default_if_none:'' }}">
                       </td>
-                      <td>
+                      <td data-col="lugar">
                         <input class="form-control form-control-sm inputflat" data-k="lugar"
                                value="{{ r.lugar|default_if_none:'' }}">
                       </td>
-                      <td>
+                      <td data-col="categoria">
                         <input class="form-control form-control-sm inputflat" data-k="categoria"
                                value="{{ r.categoria|default_if_none:'' }}">
                       </td>
-                      <td>
+                      <td data-col="objeto">
                         <input class="form-control form-control-sm inputflat" data-k="objeto"
                                value="{{ r.objeto|default_if_none:'' }}">
                       </td>
-                      <td>
+                      <td data-col="tipo_objeto">
                         <input class="form-control form-control-sm inputflat" data-k="tipo_objeto"
                                value="{{ r.tipo_objeto|default_if_none:'' }}">
                       </td>
-                      <td>
+                      <td data-col="cantidad">
                         <input class="form-control form-control-sm inputflat text-center" data-k="cantidad"
                                type="number" min="0" value="{{ r.cantidad|default_if_none:0 }}">
                       </td>
-                      <td>
+                      <td data-col="estado">
                         <select class="form-select form-select-sm inputflat estadoSel" data-k="estado">
                           {% with est=r.estado|default_if_none:'' %}
                             <option value="" {% if est == "" %}selected{% endif %}></option>
@@ -229,7 +242,7 @@
                           {% endwith %}
                         </select>
                       </td>
-                      <td>
+                      <td data-col="detalle">
                         <input class="form-control form-control-sm inputflat" data-k="detalle"
                                value="{{ r.detalle|default_if_none:'' }}">
                       </td>
@@ -242,9 +255,7 @@
 
           <!-- Footer actions -->
           <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mt-3">
-            <div class="text-muted small">
-              Consejo: puedes usar el filtro 🔎 para encontrar rápido un lugar u objeto.
-            </div>
+
 
             <div class="d-flex gap-2">
               <a href="{% url 'carga_masiva' %}" class="btn btn-outline-secondary">
@@ -385,6 +396,9 @@
   .estado-good{ background: rgba(25,135,84,.10) !important; border-color: rgba(25,135,84,.25) !important; }
   .estado-pend{ background: rgba(255,193,7,.12) !important; border-color: rgba(255,193,7,.30) !important; }
   .estado-bad { background: rgba(220,53,69,.10) !important; border-color: rgba(220,53,69,.25) !important; }
+
+  /* ✅ ocultar columnas (colapsar) */
+  .col-hidden{ display:none !important; }
 </style>
 
 <script>
@@ -476,9 +490,7 @@
     if (!tabla || !rowsShown) return;
     const trs = tabla.querySelectorAll("tbody tr");
     let visible = 0;
-    trs.forEach(tr => {
-      if (tr.style.display !== "none") visible++;
-    });
+    trs.forEach(tr => { if (tr.style.display !== "none") visible++; });
     rowsShown.textContent = visible;
   }
 
@@ -502,6 +514,92 @@
     });
   }
 
+  // ✅ Columnas colapsables (individuales) + persistencia
+  const colsList = document.getElementById("colsList");
+  const btnShowAll = document.getElementById("colsShowAll");
+  const COLS_KEY = "pvsa_carga_masiva_cols_v1";
+
+  const COLS = [
+    {k:"ubicacion", label:"Ubicación"},
+    {k:"sector", label:"Sector"},
+    {k:"piso", label:"Piso"},
+    {k:"tipo_de_lugar", label:"Tipo de lugar"},
+    {k:"lugar", label:"Lugar"},
+    {k:"categoria", label:"Categoría"},
+    {k:"objeto", label:"Objeto"},
+    {k:"tipo_objeto", label:"Tipo"},
+    {k:"cantidad", label:"Cantidad"},
+    {k:"estado", label:"Estado"},
+    {k:"detalle", label:"Detalle"},
+  ];
+
+  function loadColsState(){
+    try{
+      const raw = localStorage.getItem(COLS_KEY);
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      return (obj && typeof obj === "object") ? obj : null;
+    }catch(e){ return null; }
+  }
+
+  function saveColsState(state){
+    try{ localStorage.setItem(COLS_KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  function setColVisible(colKey, visible){
+    if (!tabla) return;
+    tabla.querySelectorAll(`[data-col="${colKey}"]`).forEach(el => {
+      el.classList.toggle("col-hidden", !visible);
+    });
+  }
+
+  function applyCols(state){
+    COLS.forEach(c => {
+      const v = (state[c.k] !== undefined) ? !!state[c.k] : true;
+      setColVisible(c.k, v);
+      const cb = document.getElementById("cbcol_" + c.k);
+      if (cb) cb.checked = v;
+    });
+  }
+
+  if (tabla && colsList){
+    const saved = loadColsState() || {};
+    // default: todo visible si no hay guardado
+    COLS.forEach(c => { if (saved[c.k] === undefined) saved[c.k] = true; });
+
+    // construir checks
+    colsList.innerHTML = "";
+    COLS.forEach(c => {
+      const wrap = document.createElement("div");
+      wrap.className = "form-check";
+      wrap.innerHTML = `
+        <input class="form-check-input" type="checkbox" id="cbcol_${c.k}">
+        <label class="form-check-label" for="cbcol_${c.k}">${c.label}</label>
+      `;
+      colsList.appendChild(wrap);
+
+      const cb = wrap.querySelector("input");
+      cb.checked = !!saved[c.k];
+      cb.addEventListener("change", () => {
+        saved[c.k] = cb.checked;
+        setColVisible(c.k, cb.checked);
+        saveColsState(saved);
+      });
+    });
+
+    if (btnShowAll){
+      btnShowAll.addEventListener("click", () => {
+        COLS.forEach(c => saved[c.k] = true);
+        applyCols(saved);
+        saveColsState(saved);
+      });
+    }
+
+    // aplicar al cargar
+    applyCols(saved);
+  }
+
+  // --- Guardar payload ---
   const btnGuardar = document.getElementById("btnGuardar");
   const payloadInput = document.getElementById("payload_json");
   const form = document.getElementById("importForm");
@@ -510,7 +608,6 @@
 
   if (btnGuardar && tabla && payloadInput && form) {
     btnGuardar.addEventListener("click", () => {
-      // UX: prevent double submit
       btnGuardar.disabled = true;
       if (spinner) spinner.classList.remove("d-none");
       if (btnLabel) btnLabel.textContent = "Guardando...";
@@ -519,7 +616,6 @@
       const trs = tabla.querySelectorAll("tbody tr");
 
       trs.forEach(tr => {
-        // si usas filtro, igual guardamos TODO (incluye ocultas). Si quieres guardar solo visibles, avísame.
         const obj = {};
         tr.querySelectorAll("[data-k]").forEach(el => {
           const k = el.getAttribute("data-k");

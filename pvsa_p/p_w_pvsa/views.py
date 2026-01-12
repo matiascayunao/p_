@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
-from .excel_utils import build_excel_sectores
+from .excel_utils import build_excel_sectores,  build_excel_plantilla_carga_masiva
 from django.db.models import Sum, Q, Case, When, IntegerField, F, Value
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 from django.contrib import messages
@@ -37,6 +37,8 @@ from .models import (
 
 import openpyxl 
 from openpyxl import load_workbook
+
+
 
 # -------------------
 # AUTH
@@ -144,6 +146,12 @@ def crear_estructura(request):
                 if not tipo_obj:
                     marca = (row.get("marca") or "").strip()
                     material = (row.get("material") or "").strip()
+
+                    if not marca:
+                        marca = "Sin marca"
+                    if not material:
+                        material=  "Sin material"
+
                     tipo_obj, _ = TipoObjeto.objects.get_or_create(
                         objeto=objeto,
                         marca=marca,
@@ -2586,13 +2594,11 @@ def _norm_header(x: object) -> str:
     s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
     return s.lower().replace(" ", "").replace("_", "")
 
-
 def _clean_text(x: object) -> str:
     if x is None:
         return ""
     s = str(x).strip()
     return "" if s == "-" else s
-
 
 HEADER_ALIASES = {
     "ubicacion": "ubicacion",
@@ -2620,23 +2626,47 @@ HEADER_ALIASES = {
 }
 
 # Para reconocer el formato normalizado (tu plantilla)
-REQUIRED_HEADERS_NORMALIZADO = {"ubicacion", "sector", "lugar", "cantidad", "estado"}
+REQUIRED_HEADERS_NORMALIZADO = {"ubicacion", "sector", "lugar", "objeto", "cantidad", "estado"}
 
-# Para reconocer el formato exportado por TU sistema (tu Excel real)
+# Para reconocer el formato exportado por TU sistema
 RE_SECTOR_UBI = re.compile(r"sector:\s*(.*?)\s*\|\s*ubicaci[oó]n:\s*(.*)", re.IGNORECASE)
+RE_PISO = re.compile(r"^\s*piso\s*\d+", re.IGNORECASE)
+RE_TIPO_LUGAR = re.compile(r"^\s*tipo\s*de\s*lugar\s*:\s*(.*)$", re.IGNORECASE)
+
+def _row_first_text(ws, r: int) -> str:
+    """Primer texto no vacío de una fila (sirve para celdas mergeadas)."""
+    for c in range(1, ws.max_column + 1):
+        v = ws.cell(r, c).value
+        if v not in (None, ""):
+            return str(v).strip()
+    return ""
+
+def _find_sector_ubicacion(ws):
+    """Busca 'Sector: X | Ubicación: Y' en las primeras filas."""
+    for r in range(1, min(ws.max_row, 15) + 1):
+        # revisamos varias columnas por si no está en A (merge raro)
+        for c in range(1, min(ws.max_column, 8) + 1):
+            v = ws.cell(r, c).value
+            if not v:
+                continue
+            m = RE_SECTOR_UBI.search(str(v))
+            if m:
+                return m.group(1).strip(), m.group(2).strip()
+    return None, None
 
 
 def _parse_normalizado(wb):
     """
-    Busca una hoja tipo 'ObjetosLugar' (o la primera) que tenga encabezados:
-    ubicacion, sector, lugar, cantidad, estado (y ojalá piso/objeto/tipo_objeto/etc.)
+    Formato normalizado:
+    hoja ObjetosLugar o primera hoja con headers:
+    ubicacion, sector, lugar, objeto, cantidad, estado (y opcionales)
     """
     ws = wb["ObjetosLugar"] if "ObjetosLugar" in wb.sheetnames else wb.worksheets[0]
 
     header_row = None
     header_map = {}
 
-    for r in range(1, min(ws.max_row, 30) + 1):
+    for r in range(1, min(ws.max_row, 40) + 1):
         mapped = []
         for c in range(1, ws.max_column + 1):
             key = HEADER_ALIASES.get(_norm_header(ws.cell(r, c).value))
@@ -2654,7 +2684,6 @@ def _parse_normalizado(wb):
 
     rows = []
     for r in range(header_row + 1, ws.max_row + 1):
-        # saltar filas vacías
         if not any(ws.cell(r, c).value not in (None, "") for c in range(1, ws.max_column + 1)):
             continue
 
@@ -2662,101 +2691,139 @@ def _parse_normalizado(wb):
         for col, key in header_map.items():
             rec[key] = ws.cell(r, col).value
 
-        rows.append(
-            {
-                "ubicacion": _clean_text(rec.get("ubicacion")),
-                "sector": _clean_text(rec.get("sector")),
-                "piso": _clean_text(rec.get("piso")),
-                "tipo_de_lugar": _clean_text(rec.get("tipo_de_lugar")) or "Sin especificar",
-                "lugar": _clean_text(rec.get("lugar")),
-                "categoria": _clean_text(rec.get("categoria")) or "Sin categoría",
-                "objeto": _clean_text(rec.get("objeto")),
-                "tipo_objeto": _clean_text(rec.get("tipo_objeto")),
-                "marca": _clean_text(rec.get("marca")),
-                "material": _clean_text(rec.get("material")),
-                "cantidad": rec.get("cantidad") if rec.get("cantidad") is not None else 0,
-                "estado": _clean_text(rec.get("estado")),
-                "detalle": _clean_text(rec.get("detalle")),
-            }
-        )
+        rows.append({
+            "ubicacion": _clean_text(rec.get("ubicacion")),
+            "sector": _clean_text(rec.get("sector")),
+            "piso": _clean_text(rec.get("piso")),
+            "tipo_de_lugar": _clean_text(rec.get("tipo_de_lugar")) or "Sin especificar",
+            "lugar": _clean_text(rec.get("lugar")),
+            "categoria": _clean_text(rec.get("categoria")) or "Sin categoría",
+            "objeto": _clean_text(rec.get("objeto")),
+            "tipo_objeto": _clean_text(rec.get("tipo_objeto")),
+            "marca": _clean_text(rec.get("marca")),
+            "material": _clean_text(rec.get("material")),
+            "cantidad": rec.get("cantidad") if rec.get("cantidad") is not None else 0,
+            "estado": _clean_text(rec.get("estado")),
+            "detalle": _clean_text(rec.get("detalle")),
+            "fecha": rec.get("fecha"),
+        })
 
     return rows
 
 
 def _parse_exportado(wb):
     """
-    Parsea el Excel exportado por tu sistema:
-    - Primera fila tipo: "Sector: X | Ubicación: Y"
-    - Luego "PISO 1", "PISO 2", ...
-    - Luego: (Nombre Lugar) + fila siguiente con encabezado "Objeto | Tipo | Cantidad | Estado | Detalle | Fecha"
+    Formato exportado por tu sistema (NUEVO):
+    - "Sector: X | Ubicación: Y"
+    - "PISO 1"
+    - "Tipo de lugar: Baño"
+    - (Fila) Nombre del lugar
+    - (Fila) headers en A,C,E,G,I,K,M: Categoría | Objeto | Tipo | Cantidad | Estado | Detalle | Fecha
+    - datos abajo
     """
     rows = []
 
-    for sheet in wb.worksheets:
-        sector = None
-        ubicacion = None
-
-        # Buscar la línea "Sector: ... | Ubicación: ..."
-        for r in range(1, 12):
-            v = sheet.cell(r, 1).value
-            if not v:
-                continue
-            m = RE_SECTOR_UBI.search(str(v))
-            if m:
-                sector = m.group(1).strip()
-                ubicacion = m.group(2).strip()
-                break
-
+    for ws in wb.worksheets:
+        sector, ubicacion = _find_sector_ubicacion(ws)
         if not sector or not ubicacion:
             continue
 
         current_piso = ""
+        current_tipo_lugar = "Sin especificar"
+
         r = 1
-        max_r = sheet.max_row
+        max_r = ws.max_row
 
         while r <= max_r:
-            a = sheet.cell(r, 1).value
+            txt = _row_first_text(ws, r)
 
-            # Detectar "PISO X"
-            if a:
-                txt = str(a).strip()
-                if _norm_header(txt).startswith("piso"):
-                    current_piso = txt
+            # PISO
+            if txt and RE_PISO.match(txt):
+                current_piso = txt # ej "PISO 1"
+                r += 1
+                continue
 
-            # Detectar inicio de bloque de lugar:
-            # fila r = nombre lugar
-            # fila r+1 col1 = "Objeto"
-            if a and sheet.cell(r + 1, 1).value and _norm_header(sheet.cell(r + 1, 1).value) == "objeto":
-                lugar = str(a).strip()
+            # Tipo de lugar
+            if txt:
+                mt = RE_TIPO_LUGAR.match(txt)
+                if mt:
+                    current_tipo_lugar = (mt.group(1) or "").strip() or "Sin especificar"
+                    r += 1
+                    continue
 
-                # datos comienzan en r+2
-                rr = r + 2
+            # Detectar fila de headers de tabla (buscamos "objeto"+"cantidad"+"estado" en cualquier columna)
+            mapped = []
+            for c in range(1, ws.max_column + 1):
+                key = HEADER_ALIASES.get(_norm_header(ws.cell(r, c).value))
+                if key:
+                    mapped.append((c, key))
+            keys = set(k for _, k in mapped)
+
+            # headers mínimos del bloque
+            if {"objeto", "cantidad", "estado"}.issubset(keys):
+                header_map = {col: key for col, key in mapped}
+
+                # buscar nombre del lugar hacia arriba (normalmente r-1)
+                lugar = ""
+                for back in (1, 2, 3, 4):
+                    if r - back < 1:
+                        break
+                    tback = _row_first_text(ws, r - back)
+                    if not tback:
+                        continue
+                    if RE_PISO.match(tback):
+                        continue
+                    if RE_TIPO_LUGAR.match(tback):
+                        continue
+                    # esta debería ser la fila mergeada del lugar
+                    lugar = tback
+                    break
+
+                if not lugar:
+                    lugar = "Sin lugar"
+
+                # columnas relevantes (si no están, quedan None)
+                col_categoria = next((c for c, k in header_map.items() if k == "categoria"), None)
+                col_objeto = next((c for c, k in header_map.items() if k == "objeto"), None)
+                col_tipo = next((c for c, k in header_map.items() if k == "tipo_objeto"), None)
+                col_cantidad = next((c for c, k in header_map.items() if k == "cantidad"), None)
+                col_estado = next((c for c, k in header_map.items() if k == "estado"), None)
+                col_detalle = next((c for c, k in header_map.items() if k == "detalle"), None)
+                col_fecha = next((c for c, k in header_map.items() if k == "fecha"), None)
+
+                rr = r + 1
                 while rr <= max_r:
-                    obj = sheet.cell(rr, 1).value
-                    if obj is None or str(obj).strip() == "":
+                    # corte por nuevo bloque
+                    tline = _row_first_text(ws, rr)
+                    if tline and (RE_PISO.match(tline) or RE_TIPO_LUGAR.match(tline)):
                         break
 
-                    tipo = sheet.cell(rr, 2).value
-                    cantidad = sheet.cell(rr, 3).value
-                    estado = sheet.cell(rr, 4).value
-                    detalle = sheet.cell(rr, 5).value
-                    # fecha = sheet.cell(rr, 6).value  # si quieres usarla después
+                    # objeto vacío => fin de tabla
+                    obj_val = ws.cell(rr, col_objeto).value if col_objeto else None
+                    if obj_val is None or str(obj_val).strip() == "":
+                        break
 
-                    rows.append(
-                        {
-                            "ubicacion": ubicacion,
-                            "sector": sector,
-                            "piso": current_piso,
-                            "tipo_de_lugar": "Sin especificar",   # en tu export no viene
-                            "lugar": lugar,
-                            "categoria": "Sin categoría",         # en tu export no viene
-                            "objeto": _clean_text(obj),
-                            "tipo_objeto": _clean_text(tipo),
-                            "cantidad": cantidad if cantidad is not None else 0,
-                            "estado": _clean_text(estado),
-                            "detalle": _clean_text(detalle),
-                        }
-                    )
+                    cat_val = ws.cell(rr, col_categoria).value if col_categoria else None
+                    tipo_val = ws.cell(rr, col_tipo).value if col_tipo else None
+                    cant_val = ws.cell(rr, col_cantidad).value if col_cantidad else 0
+                    est_val = ws.cell(rr, col_estado).value if col_estado else ""
+                    det_val = ws.cell(rr, col_detalle).value if col_detalle else ""
+                    fec_val = ws.cell(rr, col_fecha).value if col_fecha else None
+
+                    rows.append({
+                        "ubicacion": ubicacion,
+                        "sector": sector,
+                        "piso": current_piso,
+                        "tipo_de_lugar": current_tipo_lugar or "Sin especificar",
+                        "lugar": lugar,
+                        "categoria": _clean_text(cat_val) or "Sin categoría",
+                        "objeto": _clean_text(obj_val),
+                        "tipo_objeto": _clean_text(tipo_val),
+                        "cantidad": cant_val if cant_val is not None else 0,
+                        "estado": _clean_text(est_val),
+                        "detalle": _clean_text(det_val),
+                        "fecha": fec_val,
+                    })
                     rr += 1
 
                 r = rr
@@ -2765,6 +2832,7 @@ def _parse_exportado(wb):
             r += 1
 
     return rows
+
 
 
 def parse_excel(file_obj):
@@ -2781,9 +2849,10 @@ def parse_excel(file_obj):
 
     raise ValueError(
         "No pude reconocer el formato del Excel. "
-        "Acepto: (1) plantilla normalizada con columnas ubicacion/sector/lugar/cantidad/estado, "
-        "o (2) el Excel exportado por tu sistema (Sector|Ubicación, PISO, y tabla Objeto/Tipo/Cantidad...)."
+        "Acepto: (1) plantilla normalizada (con columnas ubicacion/sector/lugar/objeto/cantidad/estado), "
+        "o (2) el Excel exportado por tu sistema (Sector|Ubicación, PISO, Tipo de lugar:, LUGAR, y tabla con Categoría/Objeto/Tipo/Cantidad/Estado/Detalle/Fecha)."
     )
+
 
 
 def _split_tipo(tipo_str: str):
@@ -3092,3 +3161,15 @@ def carga_masiva(request):
             "excel/carga_masiva.html",
             {"step": "upload", "error": str(e)},
         )
+
+
+@login_required
+
+def descargar_plantilla_carga_masiva(request):
+    xlsx_bytes = build_excel_plantilla_carga_masiva()
+    response = HttpResponse(
+        xlsx_bytes,
+        content_type ="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename= "PLANTILLA_CARGA_MASIVA.xlsx"'
+    return response
