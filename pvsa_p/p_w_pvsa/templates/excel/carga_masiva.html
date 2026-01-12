@@ -71,65 +71,97 @@
   {% endif %}
 
   {% if step == "upload" %}
-    <!-- Upload -->
-    <div class="card border-0 shadow-sm rounded-4">
-      <div class="card-body p-4 p-md-5">
-        <div class="d-flex align-items-start gap-3 mb-3">
-          <div class="iconwrap">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M12 3v10m0-10 4 4m-4-4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
+    <!-- Upload + Info derecha -->
+    <div class="row g-3">
+      <!-- Upload -->
+      <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm rounded-4">
+          <div class="card-body p-4 p-md-5">
+            <div class="d-flex align-items-start gap-3 mb-3">
+              <div class="iconwrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 3v10m0-10 4 4m-4-4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+
+              <div class="w-100">
+                <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
+                  <div>
+                    <h5 class="mb-1 fw-semibold">Sube tu Excel</h5>
+                    <div class="text-muted">
+                      Puedes cargar <strong>plantilla normalizada</strong> o un <strong>Excel exportado por tu sistema</strong>.
+                      Luego podrás revisar/editar antes de guardar.
+                    </div>
+                  </div>
+
+                  <!-- ✅ Botón plantilla -->
+                  <a href="{% url 'descargar_plantilla_carga_masiva' %}" class="btn btn-outline-primary">
+                    ⬇ Descargar plantilla
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <form method="post" enctype="multipart/form-data">
+              {% csrf_token %}
+
+              <input type="file" id="id_archivo" name="archivo" accept=".xlsx,.xls" class="d-none">
+
+              <div id="dropzone" class="dropzone rounded-4 mb-3" tabindex="0" role="button" aria-label="Subir Excel">
+                <div class="dz-inner">
+                  <div class="dz-title">Haz click o arrastra tu archivo aquí</div>
+                  <div class="dz-sub text-muted">
+                    Formatos: <code>.xlsx</code>, <code>.xls</code>
+                  </div>
+
+                  <div class="dz-meta mt-3">
+                    <div class="dz-pill">
+                      <span class="dz-pill-dot"></span>
+                      <span id="dz-status">Sin archivo seleccionado</span>
+                    </div>
+                    <div id="dz-filename" class="dz-filename"></div>
+                  </div>
+
+                  <div class="dz-actions mt-3 d-flex gap-2 justify-content-center flex-wrap">
+                    <button type="button" class="btn btn-outline-secondary" id="btnPick">
+                      Elegir archivo
+                    </button>
+                    <button type="button" class="btn btn-outline-danger d-none" id="btnClear">
+                      Quitar
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <button type="submit" class="btn btn-primary px-4" id="btnUpload" disabled>
+                  Cargar y previsualizar
+                </button>
+                <span class="text-muted small">
+                  Tip: si el Excel trae “Sin categoría / Sin especificación”, puedes corregirlo en la previsualización.
+                </span>
+              </div>
+            </form>
           </div>
-          <div>
-            <h5 class="mb-1 fw-semibold">Sube tu Excel</h5>
-            <div class="text-muted">
-              Puedes cargar <strong>plantilla normalizada</strong> o un <strong>Excel exportado por tu sistema</strong>.
-              Luego podrás revisar/editar antes de guardar.
+        </div>
+      </div>
+
+      <!-- Info derecha -->
+      <div class="col-12 col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+          <div class="card-body p-4">
+            <h6 class="fw-bold mb-2">¿Cómo funciona la plantilla?</h6>
+            <div class="text-muted small">
+              • Una fila = un objeto en un lugar.<br>
+              • Obligatorio: <b>Ubicación, Sector, Lugar, Cantidad, Estado</b>.<br>
+              • Estado: <b>Bueno / Pendiente / Malo</b>.<br>
+              • “Tipo”: recomendado <b>Marca - Material</b>.<br><br>
+              La plantilla trae ejemplos y también una ayuda dentro del Excel
+              en las columnas <b>P a V</b>.
             </div>
           </div>
         </div>
-
-        <form method="post" enctype="multipart/form-data">
-          {% csrf_token %}
-
-          <input type="file" id="id_archivo" name="archivo" accept=".xlsx,.xls" class="d-none">
-
-          <div id="dropzone" class="dropzone rounded-4 mb-3" tabindex="0" role="button" aria-label="Subir Excel">
-            <div class="dz-inner">
-              <div class="dz-title">Haz click o arrastra tu archivo aquí</div>
-              <div class="dz-sub text-muted">
-                Formatos: <code>.xlsx</code>, <code>.xls</code>
-              </div>
-
-              <div class="dz-meta mt-3">
-                <div class="dz-pill">
-                  <span class="dz-pill-dot"></span>
-                  <span id="dz-status">Sin archivo seleccionado</span>
-                </div>
-                <div id="dz-filename" class="dz-filename"></div>
-              </div>
-
-              <div class="dz-actions mt-3 d-flex gap-2 justify-content-center flex-wrap">
-                <button type="button" class="btn btn-outline-secondary" id="btnPick">
-                  Elegir archivo
-                </button>
-                <button type="button" class="btn btn-outline-danger d-none" id="btnClear">
-                  Quitar
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="d-flex flex-wrap gap-2 align-items-center">
-            <button type="submit" class="btn btn-primary px-4" id="btnUpload" disabled>
-              Cargar y previsualizar
-            </button>
-            <span class="text-muted small">
-              Tip: si el Excel trae “Sin categoría / Sin especificación”, puedes corregirlo en la previsualización.
-            </span>
-          </div>
-        </form>
       </div>
     </div>
 
@@ -255,8 +287,6 @@
 
           <!-- Footer actions -->
           <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mt-3">
-
-
             <div class="d-flex gap-2">
               <a href="{% url 'carga_masiva' %}" class="btn btn-outline-secondary">
                 Volver a subir
@@ -564,10 +594,8 @@
 
   if (tabla && colsList){
     const saved = loadColsState() || {};
-    // default: todo visible si no hay guardado
     COLS.forEach(c => { if (saved[c.k] === undefined) saved[c.k] = true; });
 
-    // construir checks
     colsList.innerHTML = "";
     COLS.forEach(c => {
       const wrap = document.createElement("div");
@@ -595,7 +623,6 @@
       });
     }
 
-    // aplicar al cargar
     applyCols(saved);
   }
 
