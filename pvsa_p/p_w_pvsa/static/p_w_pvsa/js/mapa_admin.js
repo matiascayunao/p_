@@ -185,10 +185,10 @@
     `;
 
     if (popup) popup.remove();
-    popup = new maplibregl.Popup({ closeOnClick: true })
-      .setLngLat(lngLat || map.getCenter())
-      .setHTML(html)
-      .addTo(map);
+popup = new maplibregl.Popup({ closeOnClick: true, maxWidth: "260px" })
+  .setLngLat(lngLat || map.getCenter())
+  .setHTML(html)
+  .addTo(map);
   }
 
   function renderList(features) {

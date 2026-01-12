@@ -156,6 +156,33 @@
 
 <style>
   .rounded-4{ border-radius: 1rem !important; }
-  .mapwrap{ background: #fff; }
+
+  /* clave: que TODO lo del mapa quede dentro del borde redondeado */
+  .mapwrap{
+    background:#fff;
+    position:relative;
+    overflow:hidden;            /* corta lo que “se sale” */
+    border-radius: 1rem;
+  }
+  #mapaAdmin{
+    position:relative;
+    border-radius: 1rem;
+    overflow:hidden;
+  }
+
+  /* popup (que no se salga) */
+  .mapwrap .maplibregl-popup{
+    max-width: 260px !important;
+  }
+  .mapwrap .maplibregl-popup-content{
+    border-radius: 14px;
+    overflow:hidden;
+    max-width: 260px;
+  }
+
+  /* ESTA ES LA BARRITA/“PUNTA” QUE SE SUELE VER FEA / SALIRSE */
+  .mapwrap .maplibregl-popup-tip{
+    display:none !important;
+  }
 </style>
 {% endblock %}

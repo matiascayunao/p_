@@ -2090,25 +2090,79 @@ def mapa_ubicacion_editar_geom(request, ubicacion_id):
 def mapa_sector_detalle(request, sector_id):
     sector = get_object_or_404(Sector, pk=sector_id)
     geom = sector.geom
-    
 
-    ubic_qs=Ubicacion.objects.select_related("sector").filter(sector_id=sector.id).exclude(geom__isnull=True)
-
-    rows = (
-        ObjetoLugar.objects.filter(lugar__isnull=False, lugar__piso__ubicacion__sector_id=sector.id).values("lugar__piso__ubicacion_id").annotate(total = Sum("cantidad"), buenas=Sum(Case(When(estado="B",then=F("cantidad")), default=Value(0),output_field=IntegerField())), pendientes=Sum(Case(When(estado="P",then=F("cantidad")), default=Value(0), output_field=IntegerField())), malas=Sum(Case(When(estado="M", then=F("cantidad")), default=Value(0), output_field=IntegerField())))
-
+    # ubicaciones con polígono dentro del sector
+    ubic_qs = (
+        Ubicacion.objects.select_related("sector")
+        .filter(sector_id=sector.id)
+        .exclude(geom__isnull=True)
+        .order_by("ubicacion")
     )
-    stats = {}
 
+    # stats por ubicacion (CORRECTO)
+    rows = (
+        ObjetoLugar.objects
+        .filter(lugar__isnull=False, lugar__piso__ubicacion__sector_id=sector.id)
+        .values("lugar__piso__ubicacion_id")
+        .annotate(
+            total=Sum("cantidad"),
+            buenas=Sum("cantidad", filter=Q(estado="B")),
+            pendientes=Sum("cantidad", filter=Q(estado="P")),
+            malas=Sum("cantidad", filter=Q(estado="M")),
+        )
+    )
+    stats = _stats_dict_from_rows(rows, "lugar__piso__ubicacion_id")
+
+    ubic_features = []
+    for u in ubic_qs:
+        st = stats.get(str(u.id))
+        hasPct = bool(st and st["hasPct"])
+
+        ubic_features.append({
+            "type": "Feature",
+            "geometry": u.geom,
+            "properties": {
+                "id": u.id,
+                "name": u.ubicacion,
+                "sector_name": sector.sector,
+
+                "hasPct": hasPct,
+                "pct": st["pct_buenas"] if hasPct else 0,
+
+                "total": st["total"] if st else 0,
+                "buenas": st["buenas"] if st else 0,
+                "pendientes": st["pendientes"] if st else 0,
+                "malas": st["malas"] if st else 0,
+
+                "pct_buenas": st["pct_buenas"] if st else 0,
+                "pct_pendientes": st["pct_pendientes"] if st else 0,
+                "pct_malas": st["pct_malas"] if st else 0,
+
+                "detail_url": reverse("mapa_ubicacion_detalle", kwargs={"ubicacion_id": u.id}),
+                "edit_geom_url": reverse("mapa_ubicacion_editar_geom", kwargs={"ubicacion_id": u.id}),
+            },
+        })
+
+    ubic_fc = {"type": "FeatureCollection", "features": ubic_features}
+
+    return render(request, "mapa/mapa_sector_detalle.html", {
+        "sector": sector,
+        "geom": geom,
+        "ubic_fc": ubic_fc,
+    })
+
+
+def _stats_dict_from_rows(rows, key_field: str):
+    out = {}
     for r in rows:
-        uid = r["lugar__piso__ubicacion_id"]
-        total = int(r["total"] or 0)
-        buenas=int(r["buenas"] or 0)
-        pendientes = int(r["pendientes"] or 0)
-        malas = int(r["malas"]or 0)
+        _id = r[key_field]
+        total = int(r.get("total") or 0)
+        buenas = int(r.get("buenas") or 0)
+        pendientes = int(r.get("pendientes") or 0)
+        malas = int(r.get("malas") or 0)
 
         if total > 0:
-            pct_b = round((buenas * 100.0) / total , 1)
+            pct_b = round((buenas * 100.0) / total, 1)
             pct_p = round((pendientes * 100.0) / total, 1)
             pct_m = round((malas * 100.0) / total, 1)
             hasPct = True
@@ -2116,7 +2170,7 @@ def mapa_sector_detalle(request, sector_id):
             pct_b = pct_p = pct_m = 0.0
             hasPct = False
 
-        stats[str(uid)] = {
+        out[str(_id)] = {
             "total": total,
             "buenas": buenas,
             "pendientes": pendientes,
@@ -2124,54 +2178,123 @@ def mapa_sector_detalle(request, sector_id):
             "pct_buenas": pct_b,
             "pct_pendientes": pct_p,
             "pct_malas": pct_m,
-            "hasPct": hasPct
-
-        } 
-
-    ubic_features = []
-
-    for u in ubic_qs:
-        st = stats.get(str(u.id), None)
-        hasPct = bool(st and st.get("hasPct"))
-        pct = (st["pct_buenas"] if hasPct else None)
-
-        ubic_features.append({
-            "type": "Feature",
-            "geometry": u.geom,
-            "properties": {
-                "id":u.id,
-                "name": u.ubicacion,
-                "sector_name": sector.sector,
-                "hasPct": hasPct,
-                "pct": pct,
-                "total": (st["total"] if st else 0),
-                "buenas": (st["total"] if st else 0),
-                "pendientes": (st["total"] if st else 0),
-                "malas": (st["total"] if st else 0),
-                "detail_url": reverse("mapa_ubicacion_detalle", kwargs={"ubicacion_id": u.id}),
-                "edit_geom_url": reverse("mapa_ubicacion_editar_geom", kwargs={"ubicacion_id": u.id}),
-            },
-        })
-
-    ubic_fc = {"type": "FeatureCollection", "features": ubic_features}
-    return render(request, "mapa/mapa_sector_detalle.html", {
-        "sector": sector,
-        "geom": geom,
-        "ubic_fc": ubic_fc
-    })
-
-
+            "hasPct": hasPct,
+        }
+    return out
+    
 @login_required
 def mapa_ubicacion_detalle(request, ubicacion_id):
-    u = get_object_or_404(Ubicacion, pk=ubicacion_id)
-    return render(
-        request,
-        "mapa/mapa_ubicacion_detalle.html",
-        {
-            "ubicacion": u,
-            "geom": u.geom,
-        },
+    ubicacion = get_object_or_404(Ubicacion.objects.select_related("sector"), pk=ubicacion_id)
+    geom = ubicacion.geom
+
+    base = ObjetoLugar.objects.filter(
+        lugar__isnull=False,
+        lugar__piso__ubicacion_id=ubicacion.id
     )
+
+    agg = base.aggregate(
+        total=Sum("cantidad"),
+        buenas=Sum("cantidad", filter=Q(estado="B")),
+        pendientes=Sum("cantidad", filter=Q(estado="P")),
+        malas=Sum("cantidad", filter=Q(estado="M")),
+    )
+
+    total = int(agg.get("total") or 0)
+    buenas = int(agg.get("buenas") or 0)
+    pendientes = int(agg.get("pendientes") or 0)
+    malas = int(agg.get("malas") or 0)
+
+    if total > 0:
+        pct_b = round((buenas * 100.0) / total, 1)
+        pct_p = round((pendientes * 100.0) / total, 1)
+        pct_m = round((malas * 100.0) / total, 1)
+    else:
+        pct_b = pct_p = pct_m = 0.0
+
+    resumen = {
+        "total": total,
+        "buenas": buenas,
+        "pendientes": pendientes,
+        "malas": malas,
+        "pct_buenas": pct_b,
+        "pct_pendientes": pct_p,
+        "pct_malas": pct_m,
+    }
+
+    pisos = Piso.objects.filter(ubicacion_id=ubicacion.id).order_by("piso")
+
+    # stats por piso
+    piso_rows = (
+        base.values("lugar__piso_id")
+        .annotate(
+            total=Sum("cantidad"),
+            buenas=Sum("cantidad", filter=Q(estado="B")),
+            pendientes=Sum("cantidad", filter=Q(estado="P")),
+            malas=Sum("cantidad", filter=Q(estado="M")),
+        )
+    )
+    piso_stats = _stats_dict_from_rows(piso_rows, "lugar__piso_id")
+
+    # stats por lugar
+    lugar_rows = (
+        base.values("lugar_id")
+        .annotate(
+            total=Sum("cantidad"),
+            buenas=Sum("cantidad", filter=Q(estado="B")),
+            pendientes=Sum("cantidad", filter=Q(estado="P")),
+            malas=Sum("cantidad", filter=Q(estado="M")),
+        )
+    )
+    lugar_stats = _stats_dict_from_rows(lugar_rows, "lugar_id")
+
+    pisos_info = []
+    for p in pisos:
+        lugares = (
+            Lugar.objects
+            .select_related("lugar_tipo_lugar")
+            .filter(piso_id=p.id)
+            .order_by("nombre_del_lugar")
+        )
+
+        pstat = piso_stats.get(str(p.id), {
+            "total": 0, "buenas": 0, "pendientes": 0, "malas": 0,
+            "pct_buenas": 0, "pct_pendientes": 0, "pct_malas": 0,
+            "hasPct": False
+        })
+
+        lugares_info = []
+        for l in lugares:
+            lstat = lugar_stats.get(str(l.id), {
+                "total": 0, "buenas": 0, "pendientes": 0, "malas": 0,
+                "pct_buenas": 0, "pct_pendientes": 0, "pct_malas": 0,
+                "hasPct": False
+            })
+            lugares_info.append({
+                "lugar": l,
+                "stats": lstat,
+                "url_detalle": reverse("detalle_lugar", kwargs={"lugar_id": l.id}),
+                "url_lista_objetos": f"{reverse('lista_objetos_lugar')}?lugar={l.id}",
+            })
+
+        pisos_info.append({
+            "piso": p,
+            "stats": pstat,
+            "url_detalle": reverse("detalle_piso", kwargs={"piso_id": p.id}),
+            "url_lista_lugares": f"{reverse('lista_lugares')}?piso={p.id}",
+            "lugares": lugares_info,
+        })
+
+    return render(request, "mapa/mapa_ubicacion_detalle.html", {
+        "ubicacion": ubicacion,
+        "geom": geom,
+        "resumen": resumen,
+        "pisos_info": pisos_info,
+        "url_detalle_ubicacion": reverse("detalle_ubicacion", kwargs={"ubicacion_id": ubicacion.id}),
+        "url_lista_pisos": f"{reverse('lista_pisos')}?ubicacion={ubicacion.id}",
+        "url_lista_lugares": f"{reverse('lista_lugares')}?ubicacion={ubicacion.id}",
+        "url_lista_objetos_lugar": reverse("lista_objetos_lugar"),
+    })
+
 
 
 @require_POST
