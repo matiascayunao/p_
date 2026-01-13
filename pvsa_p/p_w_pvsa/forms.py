@@ -210,9 +210,7 @@ class EstructuraCompletaForm(forms.Form):
     # --- Ubicación ---
     ubicacion_existente = forms.ModelChoiceField(
         label="Ubicación (existente)",
-        queryset=Ubicacion.objects.select_related("sector")
-        .all()
-        .order_by("sector__sector", "ubicacion"),
+        queryset=Ubicacion.objects.none(), # se llena por JS / __init__
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
@@ -226,9 +224,7 @@ class EstructuraCompletaForm(forms.Form):
     # --- Piso ---
     piso_existente = forms.ModelChoiceField(
         label="Piso (existente)",
-        queryset=Piso.objects.select_related("ubicacion")
-        .all()
-        .order_by("ubicacion__ubicacion", "piso"),
+        queryset=Piso.objects.none(), # se llena por JS / __init__
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
@@ -252,39 +248,95 @@ class EstructuraCompletaForm(forms.Form):
         widget=forms.TextInput(attrs={"class": "form-control"}),
     )
 
-    # --- Nombre del lugar (siempre a mano) ---
-    nombre_del_lugar = forms.CharField(
-        label="Nombre del lugar",
+    # ✅ NUEVO: Lugar existente / nuevo
+    lugar_existente = forms.ModelChoiceField(
+        label="Lugar (existente)",
+        queryset=Lugar.objects.none(), # se llena por JS / __init__
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    lugar_nuevo = forms.CharField(
+        label="Nuevo lugar",
         max_length=100,
+        required=False,
         widget=forms.TextInput(attrs={"class": "form-control"}),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        data = self.data or None
+
+        # Dependientes: por defecto vacíos (para no listar TODO)
+        self.fields["ubicacion_existente"].queryset = Ubicacion.objects.none()
+        self.fields["piso_existente"].queryset = Piso.objects.none()
+        self.fields["lugar_existente"].queryset = Lugar.objects.none()
+
+        if not data:
+            return
+
+        sector_id = (data.get("sector_existente") or "").strip()
+        ubicacion_id = (data.get("ubicacion_existente") or "").strip()
+        piso_id = (data.get("piso_existente") or "").strip()
+        tipo_lugar_id = (data.get("tipo_lugar_existente") or "").strip()
+
+        if sector_id.isdigit():
+            self.fields["ubicacion_existente"].queryset = (
+                Ubicacion.objects.filter(sector_id=int(sector_id)).order_by("ubicacion")
+            )
+
+        if ubicacion_id.isdigit():
+            self.fields["piso_existente"].queryset = (
+                Piso.objects.filter(ubicacion_id=int(ubicacion_id)).order_by("piso")
+            )
+
+        if piso_id.isdigit() and tipo_lugar_id.isdigit():
+            self.fields["lugar_existente"].queryset = (
+                Lugar.objects.filter(
+                    piso_id=int(piso_id),
+                    lugar_tipo_lugar_id=int(tipo_lugar_id),
+                ).order_by("nombre_del_lugar")
+            )
 
     def clean(self):
         cleaned = super().clean()
 
         # Sector: existente o nuevo
         if not cleaned.get("sector_existente") and not (cleaned.get("sector_nuevo") or "").strip():
-            raise forms.ValidationError(
-                "Debes seleccionar un sector existente o escribir uno nuevo."
-            )
+            raise forms.ValidationError("Debes seleccionar un sector existente o escribir uno nuevo.")
 
         # Ubicación: existente o nueva
         if not cleaned.get("ubicacion_existente") and not (cleaned.get("ubicacion_nueva") or "").strip():
-            raise forms.ValidationError(
-                "Debes seleccionar una ubicación existente o escribir una nueva."
-            )
+            raise forms.ValidationError("Debes seleccionar una ubicación existente o escribir una nueva.")
 
         # Piso: existente o nuevo
         if not cleaned.get("piso_existente") and cleaned.get("piso_nuevo") in (None, ""):
-            raise forms.ValidationError(
-                "Debes seleccionar un piso existente o escribir uno nuevo."
-            )
+            raise forms.ValidationError("Debes seleccionar un piso existente o escribir uno nuevo.")
 
         # Tipo de lugar: existente o nuevo
         if not cleaned.get("tipo_lugar_existente") and not (cleaned.get("tipo_lugar_nuevo") or "").strip():
-            raise forms.ValidationError(
-                "Debes seleccionar un tipo de lugar existente o escribir uno nuevo."
-            )
+            raise forms.ValidationError("Debes seleccionar un tipo de lugar existente o escribir uno nuevo.")
+
+        # ✅ Lugar: existente o nuevo
+        lugar_exist = cleaned.get("lugar_existente")
+        lugar_new = (cleaned.get("lugar_nuevo") or "").strip()
+
+        if lugar_exist and lugar_new:
+            raise forms.ValidationError("Selecciona un lugar existente o escribe uno nuevo (no ambos).")
+
+        if not lugar_exist and not lugar_new:
+            raise forms.ValidationError("Debes seleccionar un lugar existente o escribir uno nuevo.")
+
+        # Si eligió lugar existente, debe calzar con piso/tipo de lugar existentes
+        piso_obj = cleaned.get("piso_existente")
+        tipo_obj = cleaned.get("tipo_lugar_existente")
+
+        if lugar_exist:
+            if not piso_obj or not tipo_obj:
+                raise forms.ValidationError("Para elegir un lugar existente debes seleccionar Piso y Tipo de lugar (existentes).")
+
+            if lugar_exist.piso_id != piso_obj.id or lugar_exist.lugar_tipo_lugar_id != tipo_obj.id:
+                raise forms.ValidationError("El lugar seleccionado no coincide con el Piso/Tipo de lugar.")
 
         return cleaned
 

@@ -106,12 +106,11 @@ def crear_estructura(request):
             # -----------------------
             # 5) LUGAR
             # -----------------------
-            nombre_lugar = cd["nombre_del_lugar"].strip()
-            lugar = Lugar.objects.create(
-                nombre_del_lugar=nombre_lugar,
-                piso=piso,
-                lugar_tipo_lugar=tipo_lugar,
-            )
+            lugar = cd.get("lugar_existente")
+            lugar_nuevo = (cd.get("lugar_nuevo")or "").strip()
+
+            if not lugar:
+                lugar = Lugar.objects.create(nombre_del_lugar = lugar_nuevo, piso=piso, lugar_tipo_lugar = tipo_lugar,)
 
             # -----------------------
             # 6) OBJETOS DEL LUGAR
@@ -1730,11 +1729,19 @@ def ajax_lugares_por_piso(request):
     (Por si lo necesitas) Devuelve lugares ligados a un piso.
     GET: ?piso_id=<id>
     """
-    piso_id = request.GET.get("piso_id")
-    from .models import Lugar
+    piso_id = (request.GET.get("piso_id") or "").strip()
+    tipo_lugar_id=(request.GET.get("tipo_lugar_id")or"").strip()
+    qs = Lugar.objects.all().order_by("nombre_del_lugar")
+    if piso_id.isdigit():
+        qs = qs.filter(piso_id=int(piso_id))
+    else:
+        qs=qs.none()
+    
 
-    qs = Lugar.objects.filter(piso_id=piso_id).order_by("nombre_del_lugar")
-    data = [{"id": l.id, "nombre": l.nombre_del_lugar} for l in qs]
+    if tipo_lugar_id.isdigit():
+        qs = qs.filter(lugar_tipo_lugar_id=int(tipo_lugar_id))
+    
+    data = [{"id":l.id, "nombre":l.nombre_del_lugar}for l in qs]
     return JsonResponse(data, safe=False)
 
 

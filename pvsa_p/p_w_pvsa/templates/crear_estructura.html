@@ -102,13 +102,23 @@
                 </div>
 
                 <!-- Nombre del lugar -->
-                <div class="mb-2">
-                    <label class="form-label">{{ form.nombre_del_lugar.label }}</label>
-                    {{ form.nombre_del_lugar }}
-                    {{ form.nombre_del_lugar.errors }}
-                    <small class="text-muted d-block">
-                        Nombre exacto del lugar (siempre se escribe a mano).
-                    </small>
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">{{form.lugar_existente.label}}</label>
+                        {{form.lugar_existente}}
+                        {{form.lugar_existente.errors}}
+                        <small class="text-muted d-block">
+                            Elige un lugar existente (según Sector/Ubicación/Piso/Tipo de lugar).
+                        </small>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">{{form.lugar_nuevo.label}}</label>
+                        {{form.lugar_nuevo}}
+                        {{form.lugar_nuevo.errors}}
+                        <small class="text-muted d-block">
+                            O escribe un nuevo lugar.
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -837,4 +847,82 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 })();
 </script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const pisoSel = document.getElementById("id_piso_existente");
+  const tipoSel = document.getElementById("id_tipo_lugar_existente");
+  const lugarSel = document.getElementById("id_lugar_existente");
+
+  const pisoNuevo = document.getElementById("id_piso_nuevo");
+  const tipoNuevo = document.getElementById("id_tipo_lugar_nuevo");
+  const lugarNuevo = document.getElementById("id_lugar_nuevo");
+
+  if (!pisoSel || !tipoSel || !lugarSel) return;
+
+  function resetLugar(){
+    lugarSel.innerHTML = '<option value="">---------</option>';
+  }
+
+  function canLoad(){
+    const pisoId = (pisoSel.value || "").trim();
+    const tipoId = (tipoSel.value || "").trim();
+    const pisoNew = (pisoNuevo?.value || "").trim();
+    const tipoNew = (tipoNuevo?.value || "").trim();
+
+    return !!(pisoId && tipoId) && !pisoNew && !tipoNew;
+  }
+
+  async function loadLugares(){
+    resetLugar();
+
+    if (!canLoad()){
+      lugarSel.disabled = true;
+      return;
+    }
+
+    lugarSel.disabled = false;
+
+    const pisoId = (pisoSel.value || "").trim();
+    const tipoId = (tipoSel.value || "").trim();
+
+    try{
+      const url = `/ajax/lugares-por-piso/?piso_id=${encodeURIComponent(pisoId)}&tipo_lugar_id=${encodeURIComponent(tipoId)}`;
+      const r = await fetch(url);
+      const data = await r.json();
+
+      data.forEach(item => {
+        const opt = document.createElement("option");
+        opt.value = item.id;
+        opt.textContent = item.nombre;
+        lugarSel.appendChild(opt);
+      });
+    }catch(err){
+      console.error("Error cargando lugares:", err);
+    }
+  }
+
+  // cambios en selects existentes => cargar lugares
+  pisoSel.addEventListener("change", loadLugares);
+  tipoSel.addEventListener("change", loadLugares);
+
+  // si escriben "nuevo piso" o "nuevo tipo de lugar" => no hay lugar existente
+  if (pisoNuevo) pisoNuevo.addEventListener("input", () => { resetLugar(); lugarSel.disabled = true; });
+  if (tipoNuevo) tipoNuevo.addEventListener("input", () => { resetLugar(); lugarSel.disabled = true; });
+
+  // si eligen lugar existente => limpiar nuevo lugar
+  if (lugarNuevo){
+    lugarSel.addEventListener("change", () => {
+      if ((lugarSel.value || "").trim()) lugarNuevo.value = "";
+    });
+    lugarNuevo.addEventListener("input", () => {
+      if ((lugarNuevo.value || "").trim()) lugarSel.value = "";
+    });
+  }
+
+  // por si viene con valores (re-render por errores)
+  loadLugares();
+});
+</script>
+
 {% endblock %}
