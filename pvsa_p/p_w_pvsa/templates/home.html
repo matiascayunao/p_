@@ -15,7 +15,7 @@
           </div>
           <h1 class="display-6 fw-bold mb-2">Gestión del puerto</h1>
           <p class="text-muted mb-0" style="max-width: 60ch;">
-            Accede rápido a <strong>carga masiva</strong>, <strong>reportes</strong>, <strong>mapa</strong> y módulos del sistema.
+            Accede rápido a <strong>carga masiva</strong>, <strong>resúmenes</strong>, <strong>mapa</strong> y módulos del sistema.
           </p>
         </div>
 
@@ -27,7 +27,7 @@
             Formulario completo
           </a>
           <a href="{% url 'resumen_general' %}" class="btn btn-outline-info btn-lg">
-            Ver reportes
+            Ver Resúmenes
           </a>
           <a href="{% url 'mapa_admin' %}" class="btn btn-outline-secondary btn-lg">
             Mapa
@@ -62,7 +62,7 @@
                   <path d="M8 17v-6m4 6V7m4 10v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
               </div>
-              <div class="fw-semibold">Reportes</div>
+              <div class="fw-semibold">Resúmenes</div>
               <div class="text-muted small">Estados por sector/ubicación/objeto</div>
             </div>
           </a>
@@ -167,7 +167,7 @@
                   </svg>
                 </div>
                 <div class="w-100">
-                  <div class="fw-semibold mb-1">Reportes</div>
+                  <div class="fw-semibold mb-1">Resúmenes</div>
                   <div class="text-muted small mb-3">Estadísticas de estado por sector, ubicación y objeto.</div>
                   <div class="d-grid">
                     <a href="{% url 'resumen_general' %}" class="btn btn-info">Ver resumen general</a>

@@ -348,17 +348,17 @@ def build_excel_plantilla_carga_masiva():
 
     # ---- columnas (A..K) ----
     headers = [
-        "Ubicación", # A -> ubicacion
-        "Sector", # B -> sector
-        "Piso", # C -> piso
-        "Tipo de lugar", # D -> tipo_de_lugar
-        "Lugar", # E -> lugar
-        "Categoría", # F -> categoria
-        "Objeto", # G -> objeto
-        "Tipo", # H -> tipo_objeto (ej: Marca - Material)
-        "Cantidad", # I -> cantidad
-        "Estado", # J -> estado (Bueno/Pendiente/Malo)
-        "Detalle", # K -> detalle
+        "Sector",
+        "Ubicación", 
+        "Piso", 
+        "Tipo de lugar", 
+        "Lugar",
+        "Categoría",
+        "Objeto", 
+        "Tipo",
+        "Cantidad", 
+        "Estado",
+        "Detalle",
     ]
 
     # anchos
@@ -468,5 +468,4 @@ def build_excel_plantilla_carga_masiva():
     wb.save(bio)
     bio.seek(0)
     return bio.getvalue()
-
 

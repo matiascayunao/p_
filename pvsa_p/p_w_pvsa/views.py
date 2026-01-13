@@ -1656,14 +1656,10 @@ def resumen_general(request):
 
     # NUEVO: marcas y materiales únicos
     marcas = (
-        TipoObjeto.objects.order_by("marca")
-        .values_list("marca", flat=True)
-        .distinct()
+        TipoObjeto.objects.exclude(Q(marca__isnull=True) | Q(material__exact="")).values_list("marca", flat=True).distinct().order_by("marca")
     )
     materiales = (
-        TipoObjeto.objects.order_by("material")
-        .values_list("material", flat=True)
-        .distinct()
+        TipoObjeto.objects.exclude(Q(material__isnull=True) | Q(material__exact="")).values_list("material", flat=True).distinct().order_by("material")
     )
 
     estados = ObjetoLugar.ESTADO

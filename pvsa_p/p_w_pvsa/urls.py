@@ -117,6 +117,4 @@ urlpatterns = [
     
     path("excel/plantilla-carga-masiva/", views.descargar_plantilla_carga_masiva, name="descargar_plantilla_carga_masiva"),
 
-
-
 ]

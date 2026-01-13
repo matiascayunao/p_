@@ -197,8 +197,10 @@
               </div>
             </div>
 
-            <div class="text-muted small">
-              Mostrando: <span id="rowsShown">0</span> / {{ payload.objetos_lugar|length }}
+            <div class="text-muted small d-flex align-items-center gap-2">
+              <span>Mostrando: <span id="rowsShown">0</span>/ {{ payload.objetos_lugar|length }}</span>
+
+              <span id="filterStatus" class="badge text-bg-light border d-none">Filtrando...</span>
             </div>
           </div>
         </div>
@@ -212,8 +214,8 @@
               <table class="table table-hover align-middle mb-0" id="tablaObjetosLugar">
                 <thead class="table-light sticky-top">
                   <tr>
-                    <th class="th-min" data-col="ubicacion">Ubicación</th>
                     <th class="th-min" data-col="sector">Sector</th>
+                    <th class="th-min" data-col="ubicacion">Ubicación</th>
                     <th class="th-min" data-col="piso">Piso</th>
                     <th class="th-med" data-col="tipo_de_lugar">Tipo de lugar</th>
                     <th class="th-med" data-col="lugar">Lugar</th>
@@ -228,13 +230,13 @@
                 <tbody>
                   {% for r in payload.objetos_lugar %}
                     <tr class="rowedit">
-                      <td data-col="ubicacion">
-                        <input class="form-control form-control-sm inputflat" data-k="ubicacion"
-                               value="{{ r.ubicacion|default_if_none:'' }}">
-                      </td>
                       <td data-col="sector">
                         <input class="form-control form-control-sm inputflat" data-k="sector"
                                value="{{ r.sector|default_if_none:'' }}">
+                      </td>
+                      <td data-col="ubicacion">
+                        <input class="form-control form-control-sm inputflat" data-k="ubicacion"
+                               value="{{ r.ubicacion|default_if_none:'' }}">
                       </td>
                       <td data-col="piso">
                         <input class="form-control form-control-sm inputflat" data-k="piso"
@@ -433,7 +435,9 @@
 
 <script>
 (function(){
-  // --- Upload (dropzone) ---
+  // =========================================================
+  // UPLOAD (dropzone)
+  // =========================================================
   const dz = document.getElementById("dropzone");
   const input = document.getElementById("id_archivo");
   const filename = document.getElementById("dz-filename");
@@ -445,18 +449,23 @@
   function setUploadState(){
     const has = input && input.files && input.files.length;
     if (!status) return;
+
     if (has){
       status.textContent = "Archivo listo para subir";
       if (filename) filename.textContent = input.files[0].name;
+
       const dot = document.querySelector(".dz-pill-dot");
       if (dot) dot.style.background = "#198754";
+
       if (btnClear) btnClear.classList.remove("d-none");
       if (btnUpload) btnUpload.disabled = false;
     } else {
       status.textContent = "Sin archivo seleccionado";
       if (filename) filename.textContent = "";
+
       const dot = document.querySelector(".dz-pill-dot");
       if (dot) dot.style.background = "#adb5bd";
+
       if (btnClear) btnClear.classList.add("d-none");
       if (btnUpload) btnUpload.disabled = true;
     }
@@ -502,10 +511,13 @@
     setUploadState();
   }
 
-  // --- Preview: filter + estado coloring + save payload ---
+  // =========================================================
+  // PREVIEW: estado coloring + filtro sin lag + columnas + guardar
+  // =========================================================
   const tabla = document.getElementById("tablaObjetosLugar");
   const filter = document.getElementById("tableFilter");
   const rowsShown = document.getElementById("rowsShown");
+  const filterStatus = document.getElementById("filterStatus"); // (si existe) badge "Filtrando..."
 
   function paintEstado(select){
     if (!select) return;
@@ -516,35 +528,150 @@
     if (v === "Malo") select.classList.add("estado-bad");
   }
 
-  function updateRowsShown(){
-    if (!tabla || !rowsShown) return;
+  function countVisibleRows(){
+    if (!tabla) return 0;
     const trs = tabla.querySelectorAll("tbody tr");
     let visible = 0;
     trs.forEach(tr => { if (tr.style.display !== "none") visible++; });
-    rowsShown.textContent = visible;
+    return visible;
   }
 
+  function setRowsShown(n){
+    if (!rowsShown) return;
+    rowsShown.textContent = String(n);
+  }
+
+  // Pintar estados al cargar
   if (tabla){
     tabla.querySelectorAll("select.estadoSel").forEach(sel => {
       paintEstado(sel);
       sel.addEventListener("change", () => paintEstado(sel));
     });
-    updateRowsShown();
+    setRowsShown(countVisibleRows());
   }
+
+  // =========================================================
+  // FILTRO SIN LAG (debounce + cache + chunking) + mini texto
+  // =========================================================
+  const tbodyRows = tabla ? Array.from(tabla.querySelectorAll("tbody tr")) : [];
+  let lastQuery = "";
+  let indexBuilt = false;
+  let pendingRAF = 0;
+
+  function showFilterStatus(msg){
+    if (!filterStatus) return;
+    filterStatus.textContent = msg || "Filtrando...";
+    filterStatus.classList.remove("d-none");
+  }
+
+  function hideFilterStatus(){
+    if (!filterStatus) return;
+    filterStatus.classList.add("d-none");
+  }
+
+  function debounce(fn, ms){
+    let t = 0;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), ms);
+    };
+  }
+
+  function buildRowSearch(tr){
+    const parts = [];
+    tr.querySelectorAll("[data-k]").forEach(el => {
+      const v = el.value ?? "";
+      parts.push(String(v));
+    });
+    tr.dataset.search = parts.join(" ").toLowerCase();
+  }
+
+  function buildIndex(done){
+    if (!tabla || indexBuilt) return done && done();
+
+    showFilterStatus("Indexando...");
+    let i = 0;
+    const CHUNK = 200;
+
+    function step(){
+      const end = Math.min(i + CHUNK, tbodyRows.length);
+      for (; i < end; i++){
+        buildRowSearch(tbodyRows[i]);
+      }
+      if (i < tbodyRows.length){
+        requestAnimationFrame(step);
+      } else {
+        indexBuilt = true;
+        hideFilterStatus();
+        done && done();
+      }
+    }
+    step();
+  }
+
+  // Mantener cache actualizada cuando editas una fila
+  if (tabla){
+    const onEdit = (e) => {
+      const tr = e.target.closest("tr");
+      if (!tr || !tr.classList.contains("rowedit")) return;
+      if (!indexBuilt) return;
+      buildRowSearch(tr);
+    };
+    tabla.addEventListener("input", onEdit, true);
+    tabla.addEventListener("change", onEdit, true);
+  }
+
+  function applyFilter(query){
+    if (!tabla) return;
+
+    // cancelar filtrado anterior
+    if (pendingRAF) cancelAnimationFrame(pendingRAF);
+    pendingRAF = 0;
+
+    const q = (query || "").trim().toLowerCase();
+    if (q === lastQuery) return;
+    lastQuery = q;
+
+    showFilterStatus("Filtrando...");
+
+    let i = 0;
+    let visible = 0;
+    const CHUNK = 250;
+
+    function step(){
+      const end = Math.min(i + CHUNK, tbodyRows.length);
+
+      for (; i < end; i++){
+        const tr = tbodyRows[i];
+        const hay = tr.dataset.search || "";
+        const show = (!q || hay.includes(q));
+        tr.style.display = show ? "" : "none";
+        if (show) visible++;
+      }
+
+      if (i < tbodyRows.length){
+        pendingRAF = requestAnimationFrame(step);
+      } else {
+        pendingRAF = 0;
+        setRowsShown(visible);
+        hideFilterStatus();
+      }
+    }
+
+    step();
+  }
+
+  const onFilterInput = debounce(() => {
+    buildIndex(() => applyFilter(filter.value));
+  }, 200);
 
   if (tabla && filter){
-    filter.addEventListener("input", () => {
-      const q = (filter.value || "").trim().toLowerCase();
-      const trs = tabla.querySelectorAll("tbody tr");
-      trs.forEach(tr => {
-        const text = tr.innerText.toLowerCase();
-        tr.style.display = (!q || text.includes(q)) ? "" : "none";
-      });
-      updateRowsShown();
-    });
+    filter.addEventListener("input", onFilterInput);
   }
 
-  // ✅ Columnas colapsables (individuales) + persistencia
+  // =========================================================
+  // COLUMNAS COLAPSABLES + PERSISTENCIA
+  // =========================================================
   const colsList = document.getElementById("colsList");
   const btnShowAll = document.getElementById("colsShowAll");
   const COLS_KEY = "pvsa_carga_masiva_cols_v1";
@@ -626,7 +753,9 @@
     applyCols(saved);
   }
 
-  // --- Guardar payload ---
+  // =========================================================
+  // GUARDAR PAYLOAD
+  // =========================================================
   const btnGuardar = document.getElementById("btnGuardar");
   const payloadInput = document.getElementById("payload_json");
   const form = document.getElementById("importForm");
@@ -647,6 +776,7 @@
         tr.querySelectorAll("[data-k]").forEach(el => {
           const k = el.getAttribute("data-k");
           let v = (el.value ?? "").trim();
+
           if (k === "cantidad") {
             const n = parseInt(v || "0", 10);
             v = Number.isFinite(n) ? n : 0;
@@ -660,6 +790,8 @@
       form.submit();
     });
   }
+
 })();
 </script>
+
 {% endblock %}

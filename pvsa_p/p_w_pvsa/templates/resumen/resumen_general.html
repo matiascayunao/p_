@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container py-4">
-    <h2 class="mb-4">Reportes / Resúmenes</h2>
+    <h2 class="mb-4">Resúmenes</h2>
 
     <div class="row">
         <!-- Panel de filtros -->
@@ -150,9 +150,11 @@
                         <select id="id_filtro_marca" name="marca" class="form-select form-select-sm">
                             <option value="">Todas las marcas</option>
                             {% for m in marcas %}
+                                {% if m %}
                                 <option value="{{ m }}" {% if marca_actual == m %}selected{% endif %}>
                                 {{ m }}
                             </option>
+                                {% endif %}
                             {% endfor %}
                         </select>
                         </div>
@@ -163,9 +165,11 @@
                         <select id="id_filtro_material" name="material" class="form-select form-select-sm">
                             <option value="">Todos los materiales</option>
                             {% for mat in materiales %}
+                                {% if mat %}
                                 <option value="{{ mat }}" {% if material_actual == mat %}selected{% endif %}>
                                 {{ mat }}
                             </option>
+                                {% endif %}
                             {% endfor %}
                         </select>
                         </div>
