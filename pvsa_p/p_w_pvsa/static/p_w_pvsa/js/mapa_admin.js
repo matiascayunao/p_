@@ -1,47 +1,75 @@
 (function () {
+  // =========================
+  // CONFIG
+  // =========================
   const MAX_ZOOM = 19;
+
+  // ✅ LÍMITES (AJUSTA A TU CUADRADO BLANCO)
+  // Formato: [ [lngSW, latSW], [lngNE, latNE] ]
+  const LIMIT_BOUNDS = [
+    [-71.5100, -32.7800], // SW (abajo-izq)
+    [-71.4500, -32.7300], // NE (arriba-der)
+  ];
+  const LIMIT_BOUNDS_OBJ = new maplibregl.LngLatBounds(LIMIT_BOUNDS[0], LIMIT_BOUNDS[1]);
 
   const STYLE = {
     version: 8,
     sources: {
       sat: {
         type: "raster",
-        tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+        tiles: [
+          "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        ],
         tileSize: 256,
         maxzoom: MAX_ZOOM,
-        attribution: "Esri"
-      }
+        attribution: "Esri",
+      },
     },
-    layers: [{ id: "sat", type: "raster", source: "sat" }]
+    layers: [{ id: "sat", type: "raster", source: "sat" }],
   };
 
+  // =========================
+  // DATA: FeatureCollection desde template
+  // =========================
   const el = document.getElementById("mapa-data");
   const fc0 = el ? JSON.parse(el.textContent) : { type: "FeatureCollection", features: [] };
 
-  // 🔥 Aseguramos IDs únicos para feature-state
+  // 🔥 IDs únicos para feature-state
   const fc = {
     type: "FeatureCollection",
     features: (fc0.features || []).map((f) => {
       const p = f.properties || {};
       const id =
-        p.kind === "sector" ? `sector-${p.sector_id}` :
-        p.kind === "ubicacion" ? `ubicacion-${p.id}` :
-        `x-${Math.random().toString(16).slice(2)}`;
-
+        p.kind === "sector"
+          ? `sector-${p.sector_id}`
+          : p.kind === "ubicacion"
+          ? `ubicacion-${p.id}`
+          : `x-${Math.random().toString(16).slice(2)}`;
       return { ...f, id };
-    })
+    }),
   };
 
+  // =========================
+  // MAP INIT
+  // =========================
   const map = new maplibregl.Map({
     container: "mapaAdmin",
     style: STYLE,
     center: [-71.484847, -32.752389],
     zoom: 15,
-    maxZoom: MAX_ZOOM
+    maxZoom: MAX_ZOOM,
+
+    // ✅ límites
+    maxBounds: LIMIT_BOUNDS_OBJ,
+    renderWorldCopies: false,
   });
 
   map.addControl(new maplibregl.NavigationControl(), "top-right");
+  map.setMaxBounds(LIMIT_BOUNDS_OBJ); // refuerzo
 
+  // =========================
+  // DOM
+  // =========================
   const vistaSel = document.getElementById("mapVista");
   const sectorSel = document.getElementById("mapSector");
   const ubicSel = document.getElementById("mapUbicacion");
@@ -55,36 +83,15 @@
   let statsUbic = {};
 
   // =========================
-  // COLOR por % BUENO
+  // UTILS
   // =========================
-  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
-
-  function colorForPct(pct) {
-  if (pct === null || pct === undefined || pct === "") return "#64748b";
-  pct = Number(pct);
-  if (!isFinite(pct)) return "#64748b";
-
-  if (pct >= 65) {
-    const t = (clamp(pct, 65, 100) - 65) / 35;
-    return mixHex("#86efac", "#16a34a", t);
-  }
-  if (pct >= 50) return "#facc15";
-
-  const t = clamp(pct, 0, 49) / 49;
-  return mixHex("#7f1d1d", "#f87171", t);
-}
-
-  function mixHex(a, b, t) {
-    const pa = hexToRgb(a), pb = hexToRgb(b);
-    const r = Math.round(pa.r + (pb.r - pa.r) * t);
-    const g = Math.round(pa.g + (pb.g - pa.g) * t);
-    const bl = Math.round(pa.b + (pb.b - pa.b) * t);
-    return rgbToHex(r, g, bl);
+  function clamp(n, a, b) {
+    return Math.max(a, Math.min(b, n));
   }
 
   function hexToRgb(h) {
-    const x = h.replace("#", "").trim();
-    const v = x.length === 3 ? x.split("").map(c => c + c).join("") : x;
+    const x = (h || "").replace("#", "").trim();
+    const v = x.length === 3 ? x.split("").map((c) => c + c).join("") : x;
     return {
       r: parseInt(v.slice(0, 2), 16),
       g: parseInt(v.slice(2, 4), 16),
@@ -97,41 +104,142 @@
     return `#${f(r)}${f(g)}${f(b)}`;
   }
 
-  function badgeForPct(pct) {
-  if (pct === null || pct === undefined || pct === "") {
-    return { label: "Sin datos", color: "#64748b" };
+  function mixHex(a, b, t) {
+    const pa = hexToRgb(a),
+      pb = hexToRgb(b);
+    const r = Math.round(pa.r + (pb.r - pa.r) * t);
+    const g = Math.round(pa.g + (pb.g - pa.g) * t);
+    const bl = Math.round(pa.b + (pb.b - pa.b) * t);
+    return rgbToHex(r, g, bl);
   }
-  pct = Number(pct);
-  if (!isFinite(pct)) return { label: "Sin datos", color: "#64748b" };
-  return { label: `${pct}% Bueno`, color: colorForPct(pct) };
-}
 
-  // =========================
-  // BBOX + LIST
-  // =========================
-  function bboxOfFeatureCollection(fc) {
-    let minX = 999, minY = 999, maxX = -999, maxY = -999;
-    fc.features.forEach(f => {
-      const coords = f.geometry?.coordinates?.[0] || [];
-      coords.forEach(([x, y]) => {
-        minX = Math.min(minX, x); minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+  function colorForPct(pct) {
+    if (pct === null || pct === undefined || pct === "") return "#64748b";
+    pct = Number(pct);
+    if (!isFinite(pct)) return "#64748b";
+
+    if (pct >= 65) {
+      const t = (clamp(pct, 65, 100) - 65) / 35;
+      return mixHex("#86efac", "#16a34a", t);
+    }
+    if (pct >= 50) return "#facc15";
+
+    const t = clamp(pct, 0, 49) / 49;
+    return mixHex("#7f1d1d", "#f87171", t);
+  }
+
+  function badgeForPct(pct) {
+    if (pct === null || pct === undefined || pct === "") {
+      return { label: "Sin datos", color: "#64748b" };
+    }
+    pct = Number(pct);
+    if (!isFinite(pct)) return { label: "Sin datos", color: "#64748b" };
+    return { label: `${pct}% Bueno`, color: colorForPct(pct) };
+  }
+
+  // ========= Geom helpers (Polygon + MultiPolygon) =========
+  function coordsFromGeom(geom) {
+    if (!geom) return [];
+
+    // Polygon: coordinates = [ ring1, ring2... ]
+    if (geom.type === "Polygon") {
+      const out = [];
+      (geom.coordinates || []).forEach((ring) => {
+        (ring || []).forEach((c) => out.push(c));
       });
+      return out;
+    }
+
+    // MultiPolygon: coordinates = [ [ring1..], [ring1..] ... ]
+    if (geom.type === "MultiPolygon") {
+      const out = [];
+      (geom.coordinates || []).forEach((poly) => {
+        (poly || []).forEach((ring) => {
+          (ring || []).forEach((c) => out.push(c));
+        });
+      });
+      return out;
+    }
+
+    return [];
+  }
+
+  function bboxFromGeom(geom) {
+    const coords = coordsFromGeom(geom);
+    let minX = 999,
+      minY = 999,
+      maxX = -999,
+      maxY = -999;
+
+    coords.forEach(([x, y]) => {
+      if (typeof x !== "number" || typeof y !== "number") return;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
     });
+
     if (minX === 999) return null;
-    return [[minX, minY], [maxX, maxY]];
+    return [
+      [minX, minY],
+      [maxX, maxY],
+    ];
+  }
+
+  function bboxOfFeatureCollection(fcX) {
+    let minX = 999,
+      minY = 999,
+      maxX = -999,
+      maxY = -999;
+
+    (fcX.features || []).forEach((f) => {
+      const bb = bboxFromGeom(f.geometry);
+      if (!bb) return;
+      minX = Math.min(minX, bb[0][0]);
+      minY = Math.min(minY, bb[0][1]);
+      maxX = Math.max(maxX, bb[1][0]);
+      maxY = Math.max(maxY, bb[1][1]);
+    });
+
+    if (minX === 999) return null;
+    return [
+      [minX, minY],
+      [maxX, maxY],
+    ];
+  }
+
+  // ========= bounds safe-fit (NO se sale del límite) =========
+  function intersectBbox(bb, limit) {
+    const sw = [
+      Math.max(bb[0][0], limit[0][0]),
+      Math.max(bb[0][1], limit[0][1]),
+    ];
+    const ne = [
+      Math.min(bb[1][0], limit[1][0]),
+      Math.min(bb[1][1], limit[1][1]),
+    ];
+    if (sw[0] > ne[0] || sw[1] > ne[1]) return null;
+    return [sw, ne];
+  }
+
+  function safeFitBounds(bb, padding = 60, maxZoom = MAX_ZOOM) {
+    const safe = bb ? intersectBbox(bb, LIMIT_BOUNDS) : null;
+
+    // Si el bb está fuera, caemos al límite completo
+    map.fitBounds(safe || LIMIT_BOUNDS, { padding, maxZoom });
+
+    // refuerzo de límites
+    map.setMaxBounds(LIMIT_BOUNDS_OBJ);
   }
 
   function zoomToFeature(f) {
-    const coords = f.geometry?.coordinates?.[0] || [];
-    let minX = 999, minY = 999, maxX = -999, maxY = -999;
-    coords.forEach(([x, y]) => {
-      minX = Math.min(minX, x); minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
-    });
-    if (minX < 999) map.fitBounds([[minX, minY], [maxX, maxY]], { padding: 60, maxZoom: MAX_ZOOM });
+    const bb = bboxFromGeom(f.geometry);
+    safeFitBounds(bb, 60, MAX_ZOOM);
   }
 
+  // =========================
+  // DATA -> % BUENO
+  // =========================
   function getPctBuenasFromFeature(f) {
     const p = f.properties || {};
     if (p.kind === "sector") return statsSector[String(p.sector_id)]?.pct_buenas ?? null;
@@ -139,14 +247,18 @@
     return null;
   }
 
+  // =========================
+  // POPUP
+  // =========================
   function popupForFeature(f, lngLat) {
     const p = f.properties || {};
     const pct = getPctBuenasFromFeature(f);
     const badge = badgeForPct(pct);
 
-    const bar = (pct === null || pct === undefined)
-      ? `<div class="small text-muted">Sin datos para calcular % Bueno</div>`
-      : `
+    const bar =
+      pct === null || pct === undefined
+        ? `<div class="small text-muted">Sin datos para calcular % Bueno</div>`
+        : `
         <div class="mt-2">
           <div class="d-flex justify-content-between small">
             <span class="text-muted">Calidad</span>
@@ -185,20 +297,25 @@
     `;
 
     if (popup) popup.remove();
-popup = new maplibregl.Popup({ closeOnClick: true, maxWidth: "260px" })
-  .setLngLat(lngLat || map.getCenter())
-  .setHTML(html)
-  .addTo(map);
+    popup = new maplibregl.Popup({ closeOnClick: true, maxWidth: "260px" })
+      .setLngLat(lngLat || map.getCenter())
+      .setHTML(html)
+      .addTo(map);
   }
 
+  // =========================
+  // LISTA LATERAL
+  // =========================
   function renderList(features) {
+    if (!lista) return;
+
     lista.innerHTML = "";
     if (!features.length) {
       lista.innerHTML = `<div class="text-muted small">No hay polígonos guardados aún.</div>`;
       return;
     }
 
-    features.forEach(f => {
+    features.forEach((f) => {
       const p = f.properties || {};
       const kind = p.kind === "sector" ? "SECTOR" : "UBICACION";
 
@@ -232,55 +349,18 @@ popup = new maplibregl.Popup({ closeOnClick: true, maxWidth: "260px" })
   }
 
   // =========================
-  // FILTROS
-  // =========================
-  function applyFilters() {
-    const vista = vistaSel.value; // todo/sector/ubicacion
-    const sectorId = sectorSel.value;
-    const ubicId = ubicSel.value;
-
-    // filtrar opciones de ubicacion por sector
-    Array.from(ubicSel.options).forEach(opt => {
-      const s = opt.getAttribute("data-sector");
-      if (!s) return;
-      opt.hidden = sectorId ? (s !== sectorId) : false;
-    });
-    if (sectorId && ubicSel.value) {
-      const opt = ubicSel.selectedOptions[0];
-      if (opt && opt.hidden) ubicSel.value = "";
-    }
-
-    const filtered = fc.features.filter(f => {
-      const p = f.properties || {};
-      if (vista !== "todo" && p.kind !== vista) return false;
-      if (sectorId && String(p.sector_id) !== String(sectorId)) return false;
-      if (ubicId && p.kind === "ubicacion" && String(p.id) !== String(ubicId)) return false;
-      if (ubicId && p.kind === "sector") return false;
-      return true;
-    });
-
-    const out = { type: "FeatureCollection", features: filtered };
-    map.getSource("polys")?.setData(out);
-
-    // recalcular feature-state visible (para pintar por %)
-    setPctStates(filtered);
-
-    renderList(filtered);
-
-    const bb = bboxOfFeatureCollection(out);
-    if (bb) map.fitBounds(bb, { padding: 60, maxZoom: MAX_ZOOM });
-  }
-
-  // =========================
-  // FEATURE-STATE (pintar por %)
+  // FEATURE-STATE (% bueno)
   // =========================
   function setPctStates(features) {
-    // Limpiamos estados para todos (opcional, pero evita “arrastre”)
-    (fc.features || []).forEach(f => {
-      try { map.setFeatureState({ source: "polys", id: f.id }, { hasPct: false, pct: null }); } catch (e) {}
+    // limpiar
+    (fc.features || []).forEach((f) => {
+      try {
+        map.setFeatureState({ source: "polys", id: f.id }, { hasPct: false, pct: null });
+      } catch (e) {}
     });
 
-    features.forEach(f => {
+    // set solo visibles
+    (features || []).forEach((f) => {
       const pct = getPctBuenasFromFeature(f);
       const has = pct !== null && pct !== undefined && isFinite(Number(pct));
       try {
@@ -293,12 +373,58 @@ popup = new maplibregl.Popup({ closeOnClick: true, maxWidth: "260px" })
   }
 
   // =========================
+  // FILTROS
+  // =========================
+  function applyFilters() {
+    if (!vistaSel || !sectorSel || !ubicSel) return;
+
+    const vista = vistaSel.value; // todo/sector/ubicacion
+    const sectorId = sectorSel.value;
+    const ubicId = ubicSel.value;
+
+    // filtrar opciones de ubicacion por sector
+    Array.from(ubicSel.options).forEach((opt) => {
+      const s = opt.getAttribute("data-sector");
+      if (!s) return;
+      opt.hidden = sectorId ? s !== sectorId : false;
+    });
+
+    if (sectorId && ubicSel.value) {
+      const opt = ubicSel.selectedOptions[0];
+      if (opt && opt.hidden) ubicSel.value = "";
+    }
+
+    const filtered = (fc.features || []).filter((f) => {
+      const p = f.properties || {};
+      if (vista !== "todo" && p.kind !== vista) return false;
+      if (sectorId && String(p.sector_id) !== String(sectorId)) return false;
+
+      if (ubicId && p.kind === "ubicacion" && String(p.id) !== String(ubicId)) return false;
+      if (ubicId && p.kind === "sector") return false;
+
+      return true;
+    });
+
+    const out = { type: "FeatureCollection", features: filtered };
+
+    const src = map.getSource("polys");
+    if (src) src.setData(out);
+
+    setPctStates(filtered);
+    renderList(filtered);
+
+    // ✅ bounds seguro (NO se sale del límite)
+    const bb = bboxOfFeatureCollection(out);
+    safeFitBounds(bb, 60, MAX_ZOOM);
+  }
+
+  // =========================
   // FETCH STATS (MISMO VIEW)
   // =========================
   async function loadStats() {
     try {
       const res = await fetch(window.location.href, {
-        headers: { "X-Requested-With": "XMLHttpRequest" }
+        headers: { "X-Requested-With": "XMLHttpRequest" },
       });
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
@@ -316,9 +442,10 @@ popup = new maplibregl.Popup({ closeOnClick: true, maxWidth: "260px" })
   // MAP LOAD
   // =========================
   map.on("load", async () => {
+    // source
     map.addSource("polys", { type: "geojson", data: fc });
 
-    // Fill por % bueno con feature-state
+    // fill (% bueno por feature-state)
     map.addLayer({
       id: "fill",
       type: "fill",
@@ -333,15 +460,16 @@ popup = new maplibregl.Popup({ closeOnClick: true, maxWidth: "260px" })
             ["interpolate", ["linear"], ["feature-state", "pct"], 65, "#86efac", 100, "#16a34a"],
             [">=", ["feature-state", "pct"], 50],
             ["interpolate", ["linear"], ["feature-state", "pct"], 50, "#facc15", 65, "#facc15"],
-            ["interpolate", ["linear"], ["feature-state", "pct"], 0, "#7f1d1d", 49, "#f87171"]
+            ["interpolate", ["linear"], ["feature-state", "pct"], 0, "#7f1d1d", 49, "#f87171"],
           ],
           // fallback si no hay pct
-          ["case", ["==", ["get", "kind"], "sector"], "#06b6b9", "#0d6efd"]
+          ["case", ["==", ["get", "kind"], "sector"], "#06b6b9", "#0d6efd"],
         ],
-        "fill-opacity": 0.28
-      }
+        "fill-opacity": 0.28,
+      },
     });
 
+    // line
     map.addLayer({
       id: "line",
       type: "line",
@@ -356,22 +484,23 @@ popup = new maplibregl.Popup({ closeOnClick: true, maxWidth: "260px" })
             "#15803d",
             [">=", ["feature-state", "pct"], 50],
             "#a16207",
-            "#991b1b"
+            "#991b1b",
           ],
-          "#0f172a"
+          "#0f172a",
         ],
-        "line-width": 3
-      }
+        "line-width": 3,
+      },
     });
 
+    // labels
     map.addLayer({
       id: "labels",
       type: "symbol",
       source: "polys",
       layout: {
         "text-field": ["get", "name"],
-        "text-size": 14
-      }
+        "text-size": 14,
+      },
     });
 
     map.on("click", "fill", (e) => {
@@ -380,31 +509,32 @@ popup = new maplibregl.Popup({ closeOnClick: true, maxWidth: "260px" })
       popupForFeature(f, e.lngLat);
     });
 
-    // 1) cargar stats
+    // 1) stats
     await loadStats();
 
-    // 2) render inicial
+    // 2) inicial
     renderList(fc.features);
-
-    // 3) set feature states iniciales
     setPctStates(fc.features);
 
-    // 4) bounds inicial
+    // 3) bounds inicial seguro
     const bb = bboxOfFeatureCollection(fc);
-    if (bb) map.fitBounds(bb, { padding: 60, maxZoom: MAX_ZOOM });
+    safeFitBounds(bb, 60, MAX_ZOOM);
 
     // eventos filtros
-    vistaSel.addEventListener("change", applyFilters);
-    sectorSel.addEventListener("change", applyFilters);
-    ubicSel.addEventListener("change", applyFilters);
+    if (vistaSel) vistaSel.addEventListener("change", applyFilters);
+    if (sectorSel) sectorSel.addEventListener("change", applyFilters);
+    if (ubicSel) ubicSel.addEventListener("change", applyFilters);
 
-    btnLimpiar.addEventListener("click", () => {
-      vistaSel.value = "todo";
-      sectorSel.value = "";
-      ubicSel.value = "";
-      applyFilters();
-    });
+    if (btnLimpiar) {
+      btnLimpiar.addEventListener("click", () => {
+        if (vistaSel) vistaSel.value = "todo";
+        if (sectorSel) sectorSel.value = "";
+        if (ubicSel) ubicSel.value = "";
+        applyFilters();
+      });
+    }
 
+    // ✅ aplicar filtros una vez (y queda dentro del límite)
     applyFilters();
   });
 })();

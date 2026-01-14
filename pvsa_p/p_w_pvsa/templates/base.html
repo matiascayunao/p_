@@ -84,17 +84,17 @@
               <ul class="navbar-nav align-items-lg-center flex-lg-nowrap gap-1 gap-lg-2 py-2 py-lg-0">
 
                 <li class="nav-item">
+                  <!-- NOTA: en tu original esto apuntaba a resumen_general.
+                       Si tu carga masiva es otra URL, cámbiala a 'carga_masiva' -->
+                  <a class="nav-link fw-semibold" href="{% url 'carga_masiva' %}">CARGA MASIVA</a>
+                </li>
+
+                <li class="nav-item">
                   <a class="nav-link fw-semibold" href="{% url 'crear_estructura' %}">FORMULARIO</a>
                 </li>
 
                 <li class="nav-item">
                   <a class="nav-link fw-semibold" href="{% url 'resumen_general' %}">RESUMEN</a>
-                </li>
-
-                <li class="nav-item">
-                  <!-- NOTA: en tu original esto apuntaba a resumen_general.
-                       Si tu carga masiva es otra URL, cámbiala a 'carga_masiva' -->
-                  <a class="nav-link fw-semibold" href="{% url 'carga_masiva' %}">CARGA MASIVA</a>
                 </li>
 
                 <li class="nav-item d-none d-lg-block">

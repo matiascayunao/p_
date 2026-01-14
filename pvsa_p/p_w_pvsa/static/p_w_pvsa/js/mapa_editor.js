@@ -8,6 +8,10 @@
   }
 
   const MAX_ZOOM = 19;
+  const LIMIT_BOUNDS = [
+    [-71.5100, -32.7800],
+    [-71.4500, -32.7300]
+  ]
 
   // Satelital (Esri)
   const STYLE_SAT = {
@@ -31,8 +35,12 @@
     style: STYLE_SAT,
     center: [-71.484847, -32.752389],
     zoom: 18,
-    maxZoom: MAX_ZOOM
+    maxZoom: MAX_ZOOM,
+    maxBounds: LIMIT_BOUNDS,
+    renderWorldCopies: false
   });
+
+  map.setMaxBounds(LIMIT_BOUNDS);
 
   map.addControl(new maplibregl.NavigationControl(), "top-right");
 
@@ -234,6 +242,7 @@
     updateBloques();
     filterUbicacionesBySector();
     loadInitialGeomIfAny();
+    map.fitBounds(LIMIT_BOUNDS, {padding : 30, maxZoom: MAX_ZOOM});
   });
 
   map.on("click", (e) => {
