@@ -82,13 +82,14 @@
   const parentUbicacionId = document.getElementById("parentUbicacionId");
   const accion = document.querySelector('input[name="accion"]')?.value || "crear";
   const editarTipo = document.querySelector('input[name="editar_tipo"]')?.value || "";
+  const editarId = document.querySelector('input[name="editar_id"]')?.value || "";
 
   function showError(msg) {
     if (errorMsg) errorMsg.textContent = msg || "Error";
     if (modalError) modalError.show();
   }
 
-  // ========= INDEX de geometrías desde mapa-data =========
+  // ========= DATA (mapa-data) =========
   const dataEl = document.getElementById("mapa-data");
   const fc0 = dataEl ? JSON.parse(dataEl.textContent) : { type: "FeatureCollection", features: [] };
 
@@ -100,7 +101,6 @@
     const kind = p.kind;
 
     if (kind === "sector") {
-      // en tu geojson ya viene properties.id = sector.id
       const sid = String(p.id || p.sector_id || "");
       if (sid && f.geometry) sectorGeomById[sid] = f.geometry;
     }
@@ -110,6 +110,80 @@
       if (uid && f.geometry) ubicGeomById[uid] = f.geometry;
     }
   });
+
+  // ========= Overlay AMARILLO: todo lo ya guardado =========
+  function buildSavedFC() {
+    // si estás editando, sacamos el mismo polígono para que no se vea doble
+    const eid = String(editarId || "");
+    const et = String(editarTipo || "");
+
+    const feats = (fc0.features || []).filter((f) => {
+      const p = f.properties || {};
+      if (!f.geometry) return false;
+
+      if (accion === "editar" && eid && et) {
+        // mismo tipo y mismo id => lo ocultamos del overlay
+        if (p.kind === et && String(p.id) === eid) return false;
+      }
+      return true;
+    });
+
+    return { type: "FeatureCollection", features: feats };
+  }
+
+  function addSavedOverlay() {
+    const savedFC = buildSavedFC();
+
+    if (!map.getSource("saved")) {
+      map.addSource("saved", { type: "geojson", data: savedFC });
+    } else {
+      map.getSource("saved").setData(savedFC);
+    }
+
+    // Línea “glow” (ancha + semi transparente)
+    if (!map.getLayer("saved-line-glow")) {
+      map.addLayer({
+        id: "saved-line-glow",
+        type: "line",
+        source: "saved",
+        paint: {
+          "line-color": "#ffff00", // amarillo fosforescente
+          "line-opacity": 0.35,
+          "line-width": 10,
+        },
+      });
+    }
+
+    // Línea principal (fina + muy brillante)
+    if (!map.getLayer("saved-line")) {
+      map.addLayer({
+        id: "saved-line",
+        type: "line",
+        source: "saved",
+        paint: {
+          "line-color": "#fff200",
+          "line-opacity": 1,
+          "line-width": 3.5,
+        },
+      });
+    }
+
+    // (opcional) relleno leve para ver “áreas” sin tapar satelital
+    if (!map.getLayer("saved-fill")) {
+      map.addLayer(
+        {
+          id: "saved-fill",
+          type: "fill",
+          source: "saved",
+          paint: {
+            "fill-color": "#fff200",
+            "fill-opacity": 0.06,
+          },
+        },
+        "saved-line-glow"
+      );
+    }
+  }
 
   // ========= Mostrar el “padre” cuando estás editando =========
   function drawParentIfEdit() {
@@ -137,13 +211,13 @@
         id: "parent-line",
         type: "line",
         source: "parent",
-        paint: { "line-color": "#0f172a", "line-width": 3 },
+        paint: { "line-color": "#00ffb7", "line-width": 3 }, // padre marcado distinto
       });
       map.addLayer({
         id: "parent-fill",
         type: "fill",
         source: "parent",
-        paint: { "fill-color": "#0f172a", "fill-opacity": 0.05 },
+        paint: { "fill-color": "#00ffb7", "fill-opacity": 0.05 },
       });
     } else {
       map.getSource("parent").setData({ type: "Feature", geometry: parentGeom, properties: {} });
@@ -155,7 +229,6 @@
     if (!tipoRegistro || !bloqueSector || !bloqueUbicacion || !bloqueLugar) return;
 
     const v = tipoRegistro.value;
-
     bloqueSector.style.display = (v === "sector") ? "" : "none";
     bloqueUbicacion.style.display = (v === "ubicacion") ? "" : "none";
     bloqueLugar.style.display = (v === "lugar") ? "" : "none";
@@ -248,12 +321,10 @@
   function setCount() {
     if (contador) contador.textContent = `Puntos: ${points.length}`;
   }
-
   function setModeLabel() {
     if (!estadoModo) return;
     estadoModo.textContent = `Modo: ${marking ? "ON (click en el mapa)" : "OFF"}`;
   }
-
   function setCursor() {
     map.getCanvas().style.cursor = marking ? "crosshair" : "";
   }
@@ -275,18 +346,14 @@
     if (points.length < 3) {
       return {
         type: "FeatureCollection",
-        features: [
-          { type: "Feature", geometry: { type: "LineString", coordinates: points }, properties: {} },
-        ],
+        features: [{ type: "Feature", geometry: { type: "LineString", coordinates: points }, properties: {} }],
       };
     }
 
     const ring = points.concat([points[0]]);
     return {
       type: "FeatureCollection",
-      features: [
-        { type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: {} },
-      ],
+      features: [{ type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: {} }],
     };
   }
 
@@ -369,13 +436,10 @@
   // ========= VALIDACIÓN: dentro del padre (Turf) =========
   function validateWithinParent(geom) {
     if (!geom) return { ok: false, msg: "Geometría inválida." };
-
-    // si no está turf, no validamos (pero tú lo cargas por CDN sí o sí)
     if (typeof turf === "undefined") return { ok: true };
 
     const child = { type: "Feature", geometry: geom, properties: {} };
 
-    // ----- EDITAR -----
     if (accion === "editar") {
       if (editarTipo === "ubicacion") {
         const sid = parentSectorId?.value || "";
@@ -400,15 +464,12 @@
       return { ok: true };
     }
 
-    // ----- CREAR -----
     const tr = tipoRegistro?.value || "sector";
 
     if (tr === "ubicacion") {
       const sid = sectorParaUbicacion?.value || "";
       const parentGeom = sectorGeomById[String(sid)];
-      if (!parentGeom) {
-        return { ok: false, msg: "El Sector seleccionado NO tiene polígono. Primero dibuja el Sector." };
-      }
+      if (!parentGeom) return { ok: false, msg: "El Sector seleccionado NO tiene polígono. Primero dibuja el Sector." };
 
       const parent = { type: "Feature", geometry: parentGeom, properties: {} };
       const ok = turf.booleanWithin(child, parent);
@@ -418,9 +479,7 @@
     if (tr === "lugar") {
       const uid = lugarUbicacion?.value || "";
       const parentGeom = ubicGeomById[String(uid)];
-      if (!parentGeom) {
-        return { ok: false, msg: "La Ubicación seleccionada NO tiene polígono. Primero dibuja la Ubicación." };
-      }
+      if (!parentGeom) return { ok: false, msg: "La Ubicación seleccionada NO tiene polígono. Primero dibuja la Ubicación." };
 
       const parent = { type: "Feature", geometry: parentGeom, properties: {} };
       const ok = turf.booleanWithin(child, parent);
@@ -432,10 +491,16 @@
 
   // ========= MAP LOAD =========
   map.on("load", () => {
+    // ✅ primero: overlay amarillo (lo guardado)
+    addSavedOverlay();
+
+    // ✅ luego: capas de dibujo del usuario
     ensureDrawLayers();
     refreshDraw();
     setModeLabel();
     setCursor();
+
+    // ✅ modo edit / padres
     updateBloques();
     filterUbicacionesBySector();
     loadInitialGeomIfAny();
@@ -473,7 +538,6 @@
         return;
       }
 
-      // ✅ Validación dentro del padre
       const v = validateWithinParent(geom);
       if (!v.ok) {
         showError(v.msg);

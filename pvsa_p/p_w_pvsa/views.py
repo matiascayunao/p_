@@ -2049,12 +2049,17 @@ def _feature(kind, obj, geom, extra_props=None):
 @login_required
 def mapa_editor_crear(request):
     sectores = Sector.objects.all().order_by("sector")
-    ubicaciones= Ubicacion.objects.select_related("sector").all().order_by("ubicacion")
+    ubicaciones = Ubicacion.objects.select_related("sector").all().order_by("ubicacion")
 
-    return render(request, "mapa/mapa_editor.html", {
-        "sectores": sectores,
-        "ubicaciones": ubicaciones,
-    })
+    return render(
+        request,
+        "mapa/mapa_editor.html",
+        {
+            "sectores": sectores,
+            "ubicaciones": ubicaciones,
+            "mapa_geojson": construir_geojson_para_mapa(),
+        },
+    )
 
 
 @login_required
@@ -2074,6 +2079,7 @@ def mapa_sector_editar_geom(request, sector_id):
             "editar_id": s.id,
             "obj_label": f"Sector: {s.sector}",
             "geom_inicial": s.geom,
+            "mapa_geojson": construir_geojson_para_mapa(),
         },
     )
 
@@ -2095,6 +2101,8 @@ def mapa_ubicacion_editar_geom(request, ubicacion_id):
             "editar_id": u.id,
             "obj_label": f"Ubicación: {u.ubicacion} (Sector {u.sector.sector})",
             "geom_inicial": u.geom,
+            "parent_sector_id": u.sector_id, # ✅ CLAVE
+            "mapa_geojson": construir_geojson_para_mapa(),
         },
     )
 
@@ -2297,9 +2305,45 @@ def mapa_ubicacion_detalle(request, ubicacion_id):
             "lugares": lugares_info,
         })
 
+    lugares_qs = (
+        Lugar.objects
+        .select_related("piso")
+        .filter(piso__ubicacion_id=ubicacion.id)
+        .exclude(geom__isnull=True)
+        .order_by("piso__piso", "nombre_del_lugar")
+    )
+
+    lugares_features = []
+    for l in lugares_qs:
+        st = lugar_stats.get(str(l.id),{
+            "total": 0, "buenas":0,"pendientes":0,"malas": 0, "pct_buenas":0, "pct_pendientes":0, "pct_malas": 0, "hasPct": False
+        })
+        lugares_features.append({
+            "type": "Feature",
+            "geometry": l.geom,
+            "properties": {
+                "id": l.id,
+                "name": l.nombre_del_lugar,
+                "piso": l.piso.piso,
+                "hasPct": bool(st.get("hasPct")),
+                "pct_buenas": float(st.get("pct_buenas") or 0),
+                "pct_pendientes": float(st.get("pct_pendientes") or 0),
+                "pct_malas":float(st.get("pct_malas") or 0),
+                "total": int(st.get("total") or 0),
+                "buenas": int(st.get("buenas")or 0),
+                "pendientes": int(st.get("pendientes") or 0),
+                "malas": int(st.get("malas") or 0),
+                "detail_url": reverse("detalle_lugar", kwargs={"lugar_id": l.id}),
+                "edit_geom_url": reverse("mapa_lugar_editar_geom", kwargs={"lugar_id": l.id}),
+            }
+        })
+
+    lugares_fc = {"type": "FeatureCollection", "features": lugares_features}
+
     return render(request, "mapa/mapa_ubicacion_detalle.html", {
         "ubicacion": ubicacion,
         "geom": geom,
+        "lugares_fc": lugares_fc, 
         "resumen": resumen,
         "pisos_info": pisos_info,
         "url_detalle_ubicacion": reverse("detalle_ubicacion", kwargs={"ubicacion_id": ubicacion.id}),
@@ -2309,16 +2353,10 @@ def mapa_ubicacion_detalle(request, ubicacion_id):
     })
 
 
-
 @require_POST
 @login_required
 @transaction.atomic
 def mapa_guardar(request):
-    """
-    Guarda polígono (GeoJSON Polygon) en Sector.geom o Ubicacion.geom.
-    - Crear: permite Sector existente/nuevo o Ubicación existente/nueva.
-    - Editar: reemplaza geom del objetivo.
-    """
     geom_json = (request.POST.get("geom_json") or "").strip()
     if not geom_json:
         return redirect("mapa_admin")
@@ -2334,6 +2372,7 @@ def mapa_guardar(request):
     if modo == "editar":
         editar_tipo = request.POST.get("editar_tipo")
         editar_id = request.POST.get("editar_id")
+
         try:
             editar_id = int(editar_id)
         except Exception:
@@ -2346,17 +2385,27 @@ def mapa_guardar(request):
             return redirect("mapa_sector_detalle", sector_id=s.id)
 
         if editar_tipo == "ubicacion":
-            u = get_object_or_404(Ubicacion, pk=editar_id)
+            u = get_object_or_404(Ubicacion.objects.select_related("sector"), pk=editar_id)
+
+            parent_geom = u.sector.geom
+            if not parent_geom:
+                messages.error(request, "El Sector padre no tiene polígono. Primero dibuja el Sector.")
+                return redirect("mapa_ubicacion_editar_geom", ubicacion_id=u.id)
+
+            if not _geom_within_parent(geom, parent_geom):
+                messages.error(request, "La Ubicación debe quedar completamente dentro del Sector (padre).")
+                return redirect("mapa_ubicacion_editar_geom", ubicacion_id=u.id)
+
             u.geom = geom
             u.save()
             return redirect("mapa_ubicacion_detalle", ubicacion_id=u.id)
-        
+
         if editar_tipo == "lugar":
             l = get_object_or_404(Lugar.objects.select_related("piso__ubicacion"), pk=editar_id)
 
             parent_geom = l.piso.ubicacion.geom
             if not parent_geom:
-                messages.error(request, "La ubicación padre no tiene polígono. Primero dibuja la Ubicación.")
+                messages.error(request, "La Ubicación padre no tiene polígono. Primero dibuja la Ubicación.")
                 return redirect("mapa_lugar_editar_geom", lugar_id=l.id)
 
             if not _geom_within_parent(geom, parent_geom):
@@ -2365,15 +2414,15 @@ def mapa_guardar(request):
 
             l.geom = geom
             l.save()
-            return redirect("detalle_lugar", lugar_id=l.id)
+            return redirect("mapa_ubicacion_detalle", lugar_id=l.id)
 
         return redirect("mapa_admin")
 
     # ========= CREAR =========
-    tipo_registro = request.POST.get("tipo_registro", "sector")  # "sector" | "ubicacion"
+    tipo_registro = request.POST.get("tipo_registro", "sector") # sector | ubicacion | lugar
 
+    # ======= CREAR LUGAR =======
     if tipo_registro == "lugar":
-        # En este flujo asumimos lugar EXISTENTE (lo eliges en el modal)
         ubicacion_id = (request.POST.get("lugar_ubicacion") or "").strip()
         lugar_id = (request.POST.get("lugar_id") or "").strip()
 
@@ -2383,7 +2432,6 @@ def mapa_guardar(request):
 
         l = get_object_or_404(Lugar.objects.select_related("piso__ubicacion"), pk=int(lugar_id))
 
-        # seguridad: el lugar debe pertenecer a esa ubicación
         if l.piso.ubicacion_id != int(ubicacion_id):
             messages.error(request, "Ese Lugar no pertenece a la Ubicación seleccionada.")
             return redirect("mapa_crear")
@@ -2394,14 +2442,14 @@ def mapa_guardar(request):
             return redirect("mapa_crear")
 
         if not _geom_within_parent(geom, parent_geom):
-            messages.error(request, "El polígono del Lugar debe quedar completamente dentro de la Ubicación.")
+            messages.error(request, "El polígono del Lugar debe quedar completamente dentro de la Ubicación seleccionada.")
             return redirect("mapa_crear")
 
         l.geom = geom
         l.save()
         return redirect("detalle_lugar", lugar_id=l.id)
 
-
+    # ======= CREAR SECTOR =======
     if tipo_registro == "sector":
         sector_existente = request.POST.get("sector_existente", "").strip()
         sector_nuevo = (request.POST.get("sector_nuevo") or "").strip()
@@ -2423,11 +2471,20 @@ def mapa_guardar(request):
         sector_obj.save()
         return redirect("mapa_sector_detalle", sector_id=sector_obj.id)
 
-    # tipo_registro == "ubicacion"
+    # ======= CREAR UBICACION =======
     sector_id = request.POST.get("sector_para_ubicacion", "").strip()
     try:
         sector_obj = Sector.objects.get(pk=int(sector_id))
     except Exception:
+        return redirect("mapa_crear")
+
+    if not sector_obj.geom:
+        messages.error(request, "El Sector seleccionado no tiene polígono. Primero dibuja el Sector.")
+        return redirect("mapa_crear")
+
+    # ✅ validación Ubicación ⊂ Sector
+    if not _geom_within_parent(geom, sector_obj.geom):
+        messages.error(request, "La Ubicación debe quedar completamente dentro del Sector seleccionado.")
         return redirect("mapa_crear")
 
     ubicacion_existente = request.POST.get("ubicacion_existente", "").strip()
@@ -2445,7 +2502,6 @@ def mapa_guardar(request):
             ubicacion=ubicacion_nueva,
             defaults={"sector": sector_obj},
         )
-        # si ya existía con otro sector, NO lo cambiamos
 
     if not ubic_obj:
         return redirect("mapa_crear")
@@ -2582,6 +2638,7 @@ def _stats_ubicacion_dict():
 def construir_geojson_para_mapa():
     features = []
 
+    # SECTORES
     for s in Sector.objects.all():
         if not s.geom:
             continue
@@ -2599,6 +2656,7 @@ def construir_geojson_para_mapa():
             },
         })
 
+    # UBICACIONES
     for u in Ubicacion.objects.select_related("sector").all():
         if not u.geom:
             continue
@@ -2613,6 +2671,25 @@ def construir_geojson_para_mapa():
                 "name": u.ubicacion,
                 "detail_url": reverse("mapa_ubicacion_detalle", kwargs={"ubicacion_id": u.id}),
                 "edit_geom_url": reverse("mapa_ubicacion_editar_geom", kwargs={"ubicacion_id": u.id}),
+            },
+        })
+
+    # LUGARES
+    for l in Lugar.objects.select_related("piso__ubicacion__sector").all():
+        if not l.geom:
+            continue
+        features.append({
+            "type": "Feature",
+            "geometry": l.geom,
+            "properties": {
+                "kind": "lugar",
+                "id": l.id,
+                "ubicacion_id": l.piso.ubicacion_id,
+                "sector_id": l.piso.ubicacion.sector_id,
+                "sector_name": l.piso.ubicacion.sector.sector,
+                "name": l.nombre_del_lugar,
+                "detail_url": reverse("detalle_lugar", kwargs={"lugar_id": l.id}),
+                "edit_geom_url": reverse("mapa_lugar_editar_geom", kwargs={"lugar_id": l.id}),
             },
         })
 
@@ -3227,72 +3304,123 @@ def descargar_plantilla_carga_masiva(request):
 
 
 def _geom_coords_all(geom):
+    """Devuelve todos los puntos [lng,lat] de Polygon o MultiPolygon."""
     if not geom or not isinstance(geom, dict):
-        t = geom.get("type")
-        coords = geom.get("coodinates") or []
-        out = []
+        return []
 
-        if t == "Polygon":
-            for ring in coords:
+    t = geom.get("type")
+    coords = geom.get("coordinates") or []
+    out = []
+
+    if t == "Polygon":
+        for ring in coords:
+            for p in ring:
+                out.append(p)
+
+    elif t == "MultiPolygon":
+        for poly in coords:
+            for ring in poly:
                 for p in ring:
                     out.append(p)
-        elif t == "MultiPolygon":
-            for poly in coords:
-                for ring in poly:
-                    for p in ring:
-                        out.append(p)
-        return out
+
+    return out
+
+def _point_on_segment(pt, a, b, eps=1e-12):
+    """True si pt está sobre el segmento AB (con tolerancia)."""
+    x, y = pt
+    x1, y1 = a
+    x2, y2 = b
+
+    # colinealidad (área ~ 0)
+    cross = (x - x1) * (y2 - y1) - (y - y1) * (x2 - x1)
+    if abs(cross) > eps:
+        return False
+
+    # dentro del bounding box del segmento
+    dot = (x - x1) * (x2 - x1) + (y - y1) * (y2 - y1)
+    if dot < -eps:
+        return False
+
+    sq_len = (x2 - x1) ** 2 + (y2 - y1) ** 2
+    if dot - sq_len > eps:
+        return False
+
+    return True
     
 def _point_in_ring(pt, ring):
-    x , y = pt
-    inside = False
+    """Ray casting + permite borde como adentro."""
+    x, y = pt
     n = len(ring)
     if n < 4:
         return False
-    j = n -1
-    for  i in range(n):
+
+    # borde = True
+    for i in range(n - 1):
+        if _point_on_segment(pt, ring[i], ring[i + 1]):
+            return True
+
+    inside = False
+    j = n - 1
+    for i in range(n):
         xi, yi = ring[i]
-        xj, yj  = ring[j]
-        intersect = ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / ((yj - yi) or 1e-12) + xi)
-        if intersect :
+        xj, yj = ring[j]
+
+        intersect = ((yi > y) != (yj > y)) and (
+            x < (xj - xi) * (y - yi) / ((yj - yi) or 1e-12) + xi
+        )
+        if intersect:
             inside = not inside
         j = i
+
     return inside
 
 def _point_in_polygon(pt, poly_geom):
-    if not poly_geom:
+    """Soporta Polygon y MultiPolygon (sin holes)."""
+    if not poly_geom or not isinstance(poly_geom, dict):
         return False
+
     t = poly_geom.get("type")
     coords = poly_geom.get("coordinates") or []
 
     if t == "Polygon":
         outer = coords[0] if coords else []
         return _point_in_ring(pt, outer)
+
     if t == "MultiPolygon":
         for poly in coords:
             outer = poly[0] if poly else []
             if _point_in_ring(pt, outer):
                 return True
         return False
+
     return False
 
 def _geom_within_parent(child_geom, parent_geom):
-    if not child_geom or  not parent_geom:
+    """
+    Validación simple:
+    - TODOS los vértices del child deben estar dentro del parent (o sobre borde).
+    """
+    if not child_geom or not parent_geom:
         return False
 
     pts = _geom_coords_all(child_geom)
-    if not  pts:
+    if not pts:
         return False
-    
+
     for pt in pts:
         if not _point_in_polygon(pt, parent_geom):
-            return  False
+            return False
+
     return True
 
 
 @login_required
 def mapa_lugar_editar_geom(request, lugar_id):
-    l = get_object_or_404(Lugar.objects.select_related("piso__ubicacion__sector"), pk=lugar_id)
+    l = get_object_or_404(
+        Lugar.objects.select_related("piso__ubicacion__sector"),
+        pk=lugar_id
+    )
+
     sectores = Sector.objects.order_by("sector")
     ubicaciones = Ubicacion.objects.select_related("sector").order_by("sector__sector", "ubicacion")
 
@@ -3302,26 +3430,26 @@ def mapa_lugar_editar_geom(request, lugar_id):
         request,
         "mapa/mapa_editor.html",
         {
-            "modo":"editar",
+            "modo": "editar",
             "sectores": sectores,
             "ubicaciones": ubicaciones,
             "editar_tipo": "lugar",
             "editar_id": l.id,
             "obj_label": f"Lugar: {l.nombre_del_lugar} (Ubicación {l.piso.ubicacion.ubicacion})",
             "geom_inicial": l.geom,
-            "parent_ubicacion_id": parent_ubicacion_id,
+            "parent_ubicacion_id": parent_ubicacion_id, # ✅ CLAVE
             "mapa_geojson": construir_geojson_para_mapa(),
         },
     )
 
 
 @login_required
-
 def mapa_lugar_quitar_geom(request, lugar_id):
     l = get_object_or_404(Lugar, pk=lugar_id)
     if request.method == "POST":
         l.geom = None
         l.save()
         return redirect("detalle_lugar", lugar_id=l.id)
+
     cancel_url = reverse("detalle_lugar", kwargs={"lugar_id": l.id})
-    return render(request, "mapa/confirm_quitar_geom.html", {"obj":l,"cancel_url": cancel_url})
+    return render(request, "mapa/confirm_quitar_geom.html", {"obj": l, "cancel_url": cancel_url})

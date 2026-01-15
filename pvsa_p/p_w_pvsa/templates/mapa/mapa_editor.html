@@ -55,7 +55,6 @@
         <input type="hidden" name="editar_tipo" value="{{ editar_tipo }}">
         <input type="hidden" name="editar_id" value="{{ editar_id }}">
 
-        {# ✅ para validar “editar” en JS #}
         <input type="hidden" id="parentSectorId" value="{{ parent_sector_id|default:'' }}">
         <input type="hidden" id="parentUbicacionId" value="{{ parent_ubicacion_id|default:'' }}">
 
@@ -127,7 +126,7 @@
               <div class="small text-muted mt-2">La lista de ubicaciones se filtra por el sector seleccionado.</div>
             </div>
 
-            <!-- ✅ Lugar -->
+            <!-- Lugar -->
             <div id="bloqueLugar" class="border rounded p-3 mb-3" style="display:none;">
               <div class="row g-2">
                 <div class="col-md-6">
@@ -175,7 +174,7 @@
   </div>
 </div>
 
-<!-- ✅ Modal Error (fuera del padre) -->
+<!-- Modal Error -->
 <div class="modal fade" id="modalErrorGeom" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -197,12 +196,10 @@
   {{ geom_inicial|json_script:"geom-inicial" }}
 {% endif %}
 
-{# ✅ Esto trae geoms de sector/ubic/lugar para validar con Turf #}
 {% if mapa_geojson %}
   {{ mapa_geojson|json_script:"mapa-data" }}
 {% endif %}
 
-{# ✅ URLs para cargar pisos/lugares por AJAX #}
 <div id="mapa-config"
      data-url-pisos="{% url 'ajax_pisos_por_ubicacion' %}"
      data-url-lugares="{% url 'ajax_lugares_por_piso' %}"></div>
@@ -211,9 +208,6 @@
 
 {% block extra_script %}
   <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-
-  {# ✅ Turf para validar geometría dentro del padre #}
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-
   <script src="{% static 'p_w_pvsa/js/mapa_editor.js' %}?v=300"></script>
 {% endblock %}

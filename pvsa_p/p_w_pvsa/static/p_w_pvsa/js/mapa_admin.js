@@ -41,9 +41,11 @@
       const p = f.properties || {};
       const id =
         p.kind === "sector"
-          ? `sector-${p.sector_id}`
+          ? `sector-${p.sector_id || p.id}`
           : p.kind === "ubicacion"
           ? `ubicacion-${p.id}`
+          : p.kind === "lugar"
+          ? `lugar-${p.id}`
           : `x-${Math.random().toString(16).slice(2)}`;
       return { ...f, id };
     }),
@@ -58,8 +60,6 @@
     center: [-71.484847, -32.752389],
     zoom: 15,
     maxZoom: MAX_ZOOM,
-
-    // ✅ límites
     maxBounds: LIMIT_BOUNDS_OBJ,
     renderWorldCopies: false,
   });
@@ -140,27 +140,18 @@
   // ========= Geom helpers (Polygon + MultiPolygon) =========
   function coordsFromGeom(geom) {
     if (!geom) return [];
-
-    // Polygon: coordinates = [ ring1, ring2... ]
     if (geom.type === "Polygon") {
       const out = [];
-      (geom.coordinates || []).forEach((ring) => {
-        (ring || []).forEach((c) => out.push(c));
-      });
+      (geom.coordinates || []).forEach((ring) => (ring || []).forEach((c) => out.push(c)));
       return out;
     }
-
-    // MultiPolygon: coordinates = [ [ring1..], [ring1..] ... ]
     if (geom.type === "MultiPolygon") {
       const out = [];
       (geom.coordinates || []).forEach((poly) => {
-        (poly || []).forEach((ring) => {
-          (ring || []).forEach((c) => out.push(c));
-        });
+        (poly || []).forEach((ring) => (ring || []).forEach((c) => out.push(c)));
       });
       return out;
     }
-
     return [];
   }
 
@@ -224,11 +215,7 @@
 
   function safeFitBounds(bb, padding = 60, maxZoom = MAX_ZOOM) {
     const safe = bb ? intersectBbox(bb, LIMIT_BOUNDS) : null;
-
-    // Si el bb está fuera, caemos al límite completo
     map.fitBounds(safe || LIMIT_BOUNDS, { padding, maxZoom });
-
-    // refuerzo de límites
     map.setMaxBounds(LIMIT_BOUNDS_OBJ);
   }
 
@@ -239,10 +226,11 @@
 
   // =========================
   // DATA -> % BUENO
+  // (solo sector/ubicacion, lugar queda “sin datos” en admin por ahora)
   // =========================
   function getPctBuenasFromFeature(f) {
     const p = f.properties || {};
-    if (p.kind === "sector") return statsSector[String(p.sector_id)]?.pct_buenas ?? null;
+    if (p.kind === "sector") return statsSector[String(p.sector_id || p.id)]?.pct_buenas ?? null;
     if (p.kind === "ubicacion") return statsUbic[String(p.id)]?.pct_buenas ?? null;
     return null;
   }
@@ -255,27 +243,23 @@
     const pct = getPctBuenasFromFeature(f);
     const badge = badgeForPct(pct);
 
-    const bar =
-      pct === null || pct === undefined
-        ? `<div class="small text-muted">Sin datos para calcular % Bueno</div>`
-        : `
-        <div class="mt-2">
-          <div class="d-flex justify-content-between small">
-            <span class="text-muted">Calidad</span>
-            <span class="fw-semibold">${pct}% Bueno</span>
-          </div>
-          <div style="height:10px; background:#e5e7eb; border-radius:999px; overflow:hidden;">
-            <div style="width:${Math.max(0, Math.min(100, pct))}%; height:10px; background:${badge.color};"></div>
-          </div>
-        </div>
-      `;
+    const kindLabel =
+      p.kind === "sector" ? "SECTOR" :
+      p.kind === "ubicacion" ? "UBICACIÓN" :
+      p.kind === "lugar" ? "LUGAR" : (p.kind || "").toUpperCase();
+
+    const sub =
+      p.kind === "sector" ? "" :
+      p.kind === "ubicacion" ? (p.sector_name || "") :
+      p.kind === "lugar" ? (`Piso ${p.piso ?? "-"} · ${p.ubicacion_name || ""}`) :
+      "";
 
     const html = `
       <div style="min-width:240px">
         <div class="d-flex justify-content-between align-items-start gap-2">
           <div>
             <div class="fw-semibold mb-1">${p.name || "-"}</div>
-            <div class="small text-muted">${(p.kind || "").toUpperCase()} · ${p.sector_name || ""}</div>
+            <div class="small text-muted">${kindLabel}${sub ? " · " + sub : ""}</div>
           </div>
           <span style="
             font-size:12px;
@@ -287,11 +271,25 @@
           ">${badge.label}</span>
         </div>
 
-        ${bar}
+        ${
+          pct === null || pct === undefined
+            ? `<div class="small text-muted mt-2">Sin datos para calcular % Bueno</div>`
+            : `
+              <div class="mt-2">
+                <div class="d-flex justify-content-between small">
+                  <span class="text-muted">Calidad</span>
+                  <span class="fw-semibold">${pct}% Bueno</span>
+                </div>
+                <div style="height:10px; background:#e5e7eb; border-radius:999px; overflow:hidden;">
+                  <div style="width:${Math.max(0, Math.min(100, pct))}%; height:10px; background:${badge.color};"></div>
+                </div>
+              </div>
+            `
+        }
 
         <div class="d-grid gap-1 mt-3">
-          <a class="btn btn-sm btn-outline-primary" href="${p.detail_url}">Detalles</a>
-          <a class="btn btn-sm btn-primary" href="${p.edit_geom_url}">Editar polígono</a>
+          ${p.detail_url ? `<a class="btn btn-sm btn-outline-primary" href="${p.detail_url}">Detalles</a>` : ""}
+          ${p.edit_geom_url ? `<a class="btn btn-sm btn-primary" href="${p.edit_geom_url}">Editar polígono</a>` : ""}
         </div>
       </div>
     `;
@@ -317,7 +315,10 @@
 
     features.forEach((f) => {
       const p = f.properties || {};
-      const kind = p.kind === "sector" ? "SECTOR" : "UBICACION";
+      const kind =
+        p.kind === "sector" ? "SECTOR" :
+        p.kind === "ubicacion" ? "UBICACIÓN" :
+        p.kind === "lugar" ? "LUGAR" : "OTRO";
 
       const pct = getPctBuenasFromFeature(f);
       const badge = badgeForPct(pct);
@@ -329,7 +330,7 @@
         <div class="d-flex justify-content-between align-items-center gap-2">
           <div>
             <div class="fw-semibold">${p.name || "-"}</div>
-            <div class="small text-muted">${kind} · ${p.sector_name || ""}</div>
+            <div class="small text-muted">${kind} · ${p.sector_name || p.ubicacion_name || ""}</div>
           </div>
           <span style="
             font-size:12px;
@@ -352,14 +353,12 @@
   // FEATURE-STATE (% bueno)
   // =========================
   function setPctStates(features) {
-    // limpiar
     (fc.features || []).forEach((f) => {
       try {
         map.setFeatureState({ source: "polys", id: f.id }, { hasPct: false, pct: null });
       } catch (e) {}
     });
 
-    // set solo visibles
     (features || []).forEach((f) => {
       const pct = getPctBuenasFromFeature(f);
       const has = pct !== null && pct !== undefined && isFinite(Number(pct));
@@ -378,7 +377,7 @@
   function applyFilters() {
     if (!vistaSel || !sectorSel || !ubicSel) return;
 
-    const vista = vistaSel.value; // todo/sector/ubicacion
+    const vista = vistaSel.value; // todo/sector/ubicacion/(lugar si lo agregas)
     const sectorId = sectorSel.value;
     const ubicId = ubicSel.value;
 
@@ -399,6 +398,7 @@
       if (vista !== "todo" && p.kind !== vista) return false;
       if (sectorId && String(p.sector_id) !== String(sectorId)) return false;
 
+      // Ubicación filtro (si eliges una ubicación en el combo, muestro solo esa)
       if (ubicId && p.kind === "ubicacion" && String(p.id) !== String(ubicId)) return false;
       if (ubicId && p.kind === "sector") return false;
 
@@ -413,7 +413,6 @@
     setPctStates(filtered);
     renderList(filtered);
 
-    // ✅ bounds seguro (NO se sale del límite)
     const bb = bboxOfFeatureCollection(out);
     safeFitBounds(bb, 60, MAX_ZOOM);
   }
@@ -442,8 +441,27 @@
   // MAP LOAD
   // =========================
   map.on("load", async () => {
-    // source
     map.addSource("polys", { type: "geojson", data: fc });
+
+    // ✅ COLORES POR DEFECTO (SIN PCT) por kind:
+    // sector = teal
+    // ubicacion = azul
+    // lugar = MORADO (distinto)
+    const fallbackFillByKind = [
+      "case",
+      ["==", ["get", "kind"], "sector"], "#06b6b9",
+      ["==", ["get", "kind"], "ubicacion"], "#0d6efd",
+      ["==", ["get", "kind"], "lugar"], "#ff2bd6", // 👈 COLOR LUGAR (cambia aquí si quieres otro)
+      "#64748b"
+    ];
+
+    const fallbackLineByKind = [
+      "case",
+      ["==", ["get", "kind"], "sector"], "#0f172a",
+      ["==", ["get", "kind"], "ubicacion"], "#0b5ed7",
+      ["==", ["get", "kind"], "lugar"], "#ff00c8", // 👈 BORDE LUGAR (cambia aquí si quieres otro)
+      "#0f172a"
+    ];
 
     // fill (% bueno por feature-state)
     map.addLayer({
@@ -462,8 +480,8 @@
             ["interpolate", ["linear"], ["feature-state", "pct"], 50, "#facc15", 65, "#facc15"],
             ["interpolate", ["linear"], ["feature-state", "pct"], 0, "#7f1d1d", 49, "#f87171"],
           ],
-          // fallback si no hay pct
-          ["case", ["==", ["get", "kind"], "sector"], "#06b6b9", "#0d6efd"],
+          // 👇 fallback cuando NO hay pct
+          fallbackFillByKind,
         ],
         "fill-opacity": 0.28,
       },
@@ -480,15 +498,18 @@
           ["==", ["feature-state", "hasPct"], true],
           [
             "case",
-            [">=", ["feature-state", "pct"], 65],
-            "#15803d",
-            [">=", ["feature-state", "pct"], 50],
-            "#a16207",
+            [">=", ["feature-state", "pct"], 65], "#15803d",
+            [">=", ["feature-state", "pct"], 50], "#a16207",
             "#991b1b",
           ],
-          "#0f172a",
+          // 👇 fallback cuando NO hay pct
+          fallbackLineByKind,
         ],
-        "line-width": 3,
+        "line-width": [
+          "case",
+          ["==", ["get", "kind"], "lugar"], 2.5,
+          3
+        ],
       },
     });
 
@@ -509,18 +530,14 @@
       popupForFeature(f, e.lngLat);
     });
 
-    // 1) stats
     await loadStats();
 
-    // 2) inicial
     renderList(fc.features);
     setPctStates(fc.features);
 
-    // 3) bounds inicial seguro
     const bb = bboxOfFeatureCollection(fc);
     safeFitBounds(bb, 60, MAX_ZOOM);
 
-    // eventos filtros
     if (vistaSel) vistaSel.addEventListener("change", applyFilters);
     if (sectorSel) sectorSel.addEventListener("change", applyFilters);
     if (ubicSel) ubicSel.addEventListener("change", applyFilters);
@@ -534,7 +551,6 @@
       });
     }
 
-    // ✅ aplicar filtros una vez (y queda dentro del límite)
     applyFilters();
   });
 })();

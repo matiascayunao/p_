@@ -118,6 +118,6 @@ urlpatterns = [
     path("excel/plantilla-carga-masiva/", views.descargar_plantilla_carga_masiva, name="descargar_plantilla_carga_masiva"),
 
     path("mapa/lugar/<int:lugar_id>/editar/", views.mapa_lugar_editar_geom, name="mapa_lugar_editar_geom"),
-    path("mapa/lugar/<int:lugar_id</quitar/", views.mapa_lugar_quitar_geom, name="mapa_lugar_quitar_geom"),
-    
+    path("mapa/lugar/<int:lugar_id>/quitar/", views.mapa_lugar_quitar_geom, name="mapa_lugar_quitar_geom"),
+
 ]

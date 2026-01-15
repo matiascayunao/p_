@@ -1,4 +1,3 @@
-{# templates/mapa/mapa_ubicacion_detalle.html ✅ REEMPLAZA COMPLETO (SIN dict_extras) #}
 {% extends "base.html" %}
 {% load static %}
 
@@ -41,7 +40,7 @@
       <div class="card-body">
         <div class="d-flex justify-content-between"><span class="text-muted">Total cant.</span><span class="fw-semibold">{{ resumen.total }}</span></div>
         <div class="d-flex justify-content-between"><span class="text-muted">Buenas</span><span class="fw-semibold">{{ resumen.buenas }}</span></div>
-        <div class="d-flex justify-content-between"><span class="text-muted">Pendientes</span><span class="fw-semibold">{{ resumen.pendientes }}</span></div>
+        <div class="d-flex justify-content-between"><span class="text-muted">Pendientes</span><span class="fwm-semibold">{{ resumen.pendientes }}</span></div>
         <div class="d-flex justify-content-between"><span class="text-muted">Malas</span><span class="fw-semibold">{{ resumen.malas }}</span></div>
 
         <hr>
@@ -137,6 +136,7 @@
 </div>
 
 {% if geom %}{{ geom|json_script:"geom-detalle" }}{% endif %}
+{% if lugares_fc %}{{ lugares_fc|json_script:"lugares-fc" }}{% endif %}
 {% endblock %}
 
 {% block extra_script %}
@@ -170,6 +170,9 @@
   const el = document.getElementById("geom-detalle");
   const geom = el ? JSON.parse(el.textContent) : null;
 
+  const lugaresEl = document.getElementById("lugares-fc");
+  const lugaresFC = lugaresEl ? JSON.parse(lugaresEl.textContent) : { type:"FeatureCollection", features:[] };
+
   function coordsFromGeom(geom){
     if (!geom) return [];
     if (geom.type === "Polygon") return geom.coordinates?.[0] || [];
@@ -181,21 +184,124 @@
     return [];
   }
 
-  function fitGeom(geom){
-    const coords = coordsFromGeom(geom);
+  function fitAll(){
+    let coords = [];
+    coords = coords.concat(coordsFromGeom(geom));
+    (lugaresFC.features || []).forEach(f => { coords = coords.concat(coordsFromGeom(f.geometry)); });
+
     let minX=999, minY=999, maxX=-999, maxY=-999;
-    coords.forEach(([x,y]) => { minX=Math.min(minX,x); minY=Math.min(minY,y); maxX=Math.max(maxX,x); maxY=Math.max(maxY,y); });
+    coords.forEach(([x,y]) => {
+      minX=Math.min(minX,x); minY=Math.min(minY,y);
+      maxX=Math.max(maxX,x); maxY=Math.max(maxY,y);
+    });
     if (minX < 999) map.fitBounds([[minX,minY],[maxX,maxY]], { padding: 40, maxZoom: MAX_ZOOM });
   }
 
   map.on("load", () => {
-    if (!geom) return;
+    // UBICACIÓN (base)
+    if (geom){
+      map.addSource("pol", { type:"geojson", data:{ type:"Feature", geometry: geom, properties:{} } });
+      map.addLayer({ id:"fill", type:"fill", source:"pol", paint:{ "fill-color":"#0d6efd", "fill-opacity":0.15 } });
+      map.addLayer({ id:"line", type:"line", source:"pol", paint:{ "line-color":"#0d6efd", "line-width":3 } });
+    }
 
-    map.addSource("pol", { type: "geojson", data: { type:"Feature", geometry: geom, properties:{} } });
-    map.addLayer({ id:"fill", type:"fill", source:"pol", paint:{ "fill-color":"#0d6efd", "fill-opacity":0.25 } });
-    map.addLayer({ id:"line", type:"line", source:"pol", paint:{ "line-color":"#0d6efd", "line-width":3 } });
+    // LUGARES (con color por % bueno)
+    if ((lugaresFC.features || []).length){
+      map.addSource("lugares", { type:"geojson", data: lugaresFC });
 
-    fitGeom(geom);
+      map.addLayer({
+        id:"lugares-fill",
+        type:"fill",
+        source:"lugares",
+        paint:{
+          "fill-color":[
+            "case",
+            ["==", ["get","hasPct"], true],
+            [
+              "case",
+              [">=", ["get","pct_buenas"], 65],
+              ["interpolate", ["linear"], ["get","pct_buenas"], 65, "#86efac", 100, "#16a34a"],
+              [">=", ["get","pct_buenas"], 50],
+              "#facc15",
+              ["interpolate", ["linear"], ["get","pct_buenas"], 0, "#7f1d1d", 49, "#f87171"]
+            ],
+            "#94a3b8"
+          ],
+          "fill-opacity": 0.35
+        }
+      });
+
+      map.addLayer({
+        id:"lugares-line",
+        type:"line",
+        source:"lugares",
+        paint:{
+          "line-color":[
+            "case",
+            ["==", ["get","hasPct"], true],
+            [
+              "case",
+              [">=", ["get","pct_buenas"], 65], "#15803d",
+              [">=", ["get","pct_buenas"], 50], "#a16207",
+              "#991b1b"
+            ],
+            "#334155"
+          ],
+          "line-width": 3
+        }
+      });
+
+      map.addLayer({
+        id:"lugares-label",
+        type:"symbol",
+        source:"lugares",
+        layout:{ "text-field":["get","name"], "text-size":12 }
+      });
+
+      let pop = null;
+      map.on("click", "lugares-fill", (e) => {
+        const f = e.features && e.features[0];
+        if (!f) return;
+        const p = f.properties || {};
+
+        const hasPct = (p.hasPct === true || p.hasPct === "true");
+        const pct = Number(p.pct_buenas || 0);
+
+        const badgeColor = !hasPct ? "#64748b" : (pct >= 65 ? "#16a34a" : (pct >= 50 ? "#f59e0b" : "#ef4444"));
+        const badgeLabel = !hasPct ? "Sin datos" : `${pct}% Bueno`;
+
+        const html = `
+          <div style="min-width:240px">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <div class="fw-semibold mb-1">${p.name || "-"}</div>
+                <div class="small text-muted">Piso ${p.piso || "-"}</div>
+              </div>
+              <span style="font-size:12px;color:white;background:${badgeColor};padding:4px 8px;border-radius:999px;white-space:nowrap;">
+                ${badgeLabel}
+              </span>
+            </div>
+
+            <div class="small text-muted mt-2">
+              Total: <b>${p.total || 0}</b> · Buenas: <b>${p.buenas || 0}</b> · Pend: <b>${p.pendientes || 0}</b> · Malas: <b>${p.malas || 0}</b>
+            </div>
+
+            <div class="d-grid gap-1 mt-3">
+              <a class="btn btn-sm btn-outline-primary" href="${p.detail_url}">Detalle lugar</a>
+              <a class="btn btn-sm btn-primary" href="${p.edit_geom_url}">Editar polígono</a>
+            </div>
+          </div>
+        `;
+
+        if (pop) pop.remove();
+        pop = new maplibregl.Popup({ closeOnClick:true })
+          .setLngLat(e.lngLat)
+          .setHTML(html)
+          .addTo(map);
+      });
+    }
+
+    fitAll();
   });
 </script>
 {% endblock %}
