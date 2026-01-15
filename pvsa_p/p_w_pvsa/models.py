@@ -63,6 +63,9 @@ class Lugar(models.Model):
         on_delete=models.RESTRICT,
     )
 
+    geom = models.JSONField(null=True, blank=True)
+
+
     def __str__(self):
         # Nombre del lugar + piso + ubicación
         return (
