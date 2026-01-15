@@ -451,7 +451,7 @@
       "case",
       ["==", ["get", "kind"], "sector"], "#06b6b9",
       ["==", ["get", "kind"], "ubicacion"], "#0d6efd",
-      ["==", ["get", "kind"], "lugar"], "#ff2bd6", // 👈 COLOR LUGAR (cambia aquí si quieres otro)
+      ["==", ["get", "kind"], "lugar"], "#a855f7", // 👈 COLOR LUGAR (cambia aquí si quieres otro)
       "#64748b"
     ];
 
@@ -459,7 +459,7 @@
       "case",
       ["==", ["get", "kind"], "sector"], "#0f172a",
       ["==", ["get", "kind"], "ubicacion"], "#0b5ed7",
-      ["==", ["get", "kind"], "lugar"], "#ff00c8", // 👈 BORDE LUGAR (cambia aquí si quieres otro)
+      ["==", ["get", "kind"], "lugar"], "#7c3aed", // 👈 BORDE LUGAR (cambia aquí si quieres otro)
       "#0f172a"
     ];
 
