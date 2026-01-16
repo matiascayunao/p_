@@ -120,4 +120,6 @@ urlpatterns = [
     path("mapa/lugar/<int:lugar_id>/editar/", views.mapa_lugar_editar_geom, name="mapa_lugar_editar_geom"),
     path("mapa/lugar/<int:lugar_id>/quitar/", views.mapa_lugar_quitar_geom, name="mapa_lugar_quitar_geom"),
 
+    path("mapa/stats/",views.mapa_admin_stats, name="mapa_admin_stats"),
+
 ]

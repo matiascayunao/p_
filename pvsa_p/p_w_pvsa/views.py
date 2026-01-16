@@ -2698,12 +2698,6 @@ def construir_geojson_para_mapa():
 
 @login_required
 def mapa_admin(request):
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return JsonResponse({
-            "sector": _stats_sector_dict(),
-            "ubicacion": _stats_ubicacion_dict(),
-        })
-
     context = {
         "sectores": Sector.objects.all().order_by("sector"),
         "ubicaciones": Ubicacion.objects.select_related("sector").all().order_by("ubicacion"),
@@ -2711,6 +2705,14 @@ def mapa_admin(request):
     }
     return render(request, "mapa/mapa_admin.html", context)
 
+
+@require_GET
+@login_required
+def mapa_admin_stats(request):
+    return JsonResponse({
+        "sector": _stats_sector_dict(),
+        "ubicacion": _stats_ubicacion_dict(),
+    })
 
 # =========================
 # Helpers: parsing Excel

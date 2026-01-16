@@ -422,7 +422,7 @@
   // =========================
   async function loadStats() {
     try {
-      const res = await fetch(window.location.href, {
+      const res = await fetch("stats/", {
         headers: { "X-Requested-With": "XMLHttpRequest" },
       });
       if (!res.ok) throw new Error("HTTP " + res.status);
@@ -451,7 +451,7 @@
       "case",
       ["==", ["get", "kind"], "sector"], "#06b6b9",
       ["==", ["get", "kind"], "ubicacion"], "#0d6efd",
-      ["==", ["get", "kind"], "lugar"], "#a855f7", // 👈 COLOR LUGAR (cambia aquí si quieres otro)
+      ["==", ["get", "kind"], "lugar"], "#a855f7 ", // 👈 COLOR LUGAR (cambia aquí si quieres otro)
       "#64748b"
     ];
 
