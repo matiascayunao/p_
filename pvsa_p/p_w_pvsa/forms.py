@@ -22,6 +22,9 @@ class CrearSector(ModelForm):
     class Meta:
         model = Sector
         fields = ["sector"]
+        widgets = {
+            "sector": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: Patio Norte"})
+        }
 
 
 class CrearUbicacion(ModelForm):
@@ -118,6 +121,9 @@ class EditarSector(ModelForm):
     class Meta:
         model = Sector
         fields = ["sector"]
+        widgets = {
+            "sector": forms.TextInput(attrs={"class": "form-control"})
+        }
 
 
 class EditarUbicacion(ModelForm):

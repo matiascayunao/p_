@@ -1,3 +1,4 @@
+/* static/p_w_pvsa/js/mapa_admin.js */
 (function () {
   // =========================
   // CONFIG
@@ -5,10 +6,9 @@
   const MAX_ZOOM = 19;
 
   // ✅ LÍMITES (AJUSTA A TU CUADRADO BLANCO)
-  // Formato: [ [lngSW, latSW], [lngNE, latNE] ]
   const LIMIT_BOUNDS = [
-    [-71.5100, -32.7800], // SW (abajo-izq)
-    [-71.4500, -32.7300], // NE (arriba-der)
+    [-71.5100, -32.7800], // SW
+    [-71.4500, -32.7300], // NE
   ];
   const LIMIT_BOUNDS_OBJ = new maplibregl.LngLatBounds(LIMIT_BOUNDS[0], LIMIT_BOUNDS[1]);
 
@@ -37,18 +37,20 @@
   // 🔥 IDs únicos para feature-state
   const fc = {
     type: "FeatureCollection",
-    features: (fc0.features || []).map((f) => {
-      const p = f.properties || {};
-      const id =
-        p.kind === "sector"
-          ? `sector-${p.sector_id || p.id}`
-          : p.kind === "ubicacion"
-          ? `ubicacion-${p.id}`
-          : p.kind === "lugar"
-          ? `lugar-${p.id}`
-          : `x-${Math.random().toString(16).slice(2)}`;
-      return { ...f, id };
-    }),
+    features: (fc0.features || [])
+      .filter(f => !!f && !!f.geometry)
+      .map((f) => {
+        const p = f.properties || {};
+        const baseId =
+          p.kind === "sector"
+            ? `sector-${p.sector_id || p.id}`
+            : p.kind === "ubicacion"
+            ? `ubicacion-${p.id}`
+            : p.kind === "lugar"
+            ? `lugar-${p.id}`
+            : `x-${Math.random().toString(16).slice(2)}`;
+        return { ...f, id: baseId };
+      }),
   };
 
   // =========================
@@ -65,7 +67,7 @@
   });
 
   map.addControl(new maplibregl.NavigationControl(), "top-right");
-  map.setMaxBounds(LIMIT_BOUNDS_OBJ); // refuerzo
+  map.setMaxBounds(LIMIT_BOUNDS_OBJ);
 
   // =========================
   // DOM
@@ -81,6 +83,7 @@
   // stats cache (desde fetch)
   let statsSector = {};
   let statsUbic = {};
+  let statsLugar = {}; // ✅ NUEVO
 
   // =========================
   // UTILS
@@ -199,7 +202,7 @@
     ];
   }
 
-  // ========= bounds safe-fit (NO se sale del límite) =========
+  // ========= bounds safe-fit =========
   function intersectBbox(bb, limit) {
     const sw = [
       Math.max(bb[0][0], limit[0][0]),
@@ -225,13 +228,30 @@
   }
 
   // =========================
-  // DATA -> % BUENO
-  // (solo sector/ubicacion, lugar queda “sin datos” en admin por ahora)
+  // STATS helpers
   // =========================
+  function asNumOrNull(x) {
+    const n = Number(x);
+    return isFinite(n) ? n : null;
+  }
+
+  function getStatsForFeature(f) {
+    const p = f.properties || {};
+    if (p.kind === "sector") return statsSector[String(p.sector_id || p.id)] || null;
+    if (p.kind === "ubicacion") return statsUbic[String(p.id)] || null;
+    if (p.kind === "lugar") return statsLugar[String(p.id)] || null;
+    return null;
+  }
+
   function getPctBuenasFromFeature(f) {
     const p = f.properties || {};
-    if (p.kind === "sector") return statsSector[String(p.sector_id || p.id)]?.pct_buenas ?? null;
-    if (p.kind === "ubicacion") return statsUbic[String(p.id)]?.pct_buenas ?? null;
+    const st = getStatsForFeature(f);
+    if (st && st.pct_buenas !== undefined && st.pct_buenas !== null) return asNumOrNull(st.pct_buenas);
+
+    // fallback si el geojson ya trae pct
+    if (p.pct_buenas !== undefined && p.pct_buenas !== null) return asNumOrNull(p.pct_buenas);
+    if (p.pct !== undefined && p.pct !== null) return asNumOrNull(p.pct);
+
     return null;
   }
 
@@ -240,19 +260,44 @@
   // =========================
   function popupForFeature(f, lngLat) {
     const p = f.properties || {};
+    const st = getStatsForFeature(f) || {};
     const pct = getPctBuenasFromFeature(f);
     const badge = badgeForPct(pct);
 
+    const isMovil = (p.is_movil === true || p.is_movil === "true");
     const kindLabel =
       p.kind === "sector" ? "SECTOR" :
       p.kind === "ubicacion" ? "UBICACIÓN" :
-      p.kind === "lugar" ? "LUGAR" : (p.kind || "").toUpperCase();
+      p.kind === "lugar" ? (isMovil ? "CONTENEDOR / MÓVIL" : "LUGAR") :
+      (p.kind || "").toUpperCase();
 
-    const sub =
-      p.kind === "sector" ? "" :
-      p.kind === "ubicacion" ? (p.sector_name || "") :
-      p.kind === "lugar" ? (`Piso ${p.piso ?? "-"} · ${p.ubicacion_name || ""}`) :
-      "";
+    let sub = "";
+    if (p.kind === "ubicacion") sub = p.sector_name || "";
+    if (p.kind === "lugar") {
+      if (isMovil) sub = `Sector ${p.sector_name || ""}`;
+      else sub = `${p.ubicacion_name ? (p.ubicacion_name + " · ") : ""}Piso ${p.piso ?? "-"}`;
+    }
+
+    const totalsOk = (st.total !== undefined && st.total !== null);
+    const totalsHtml = !totalsOk ? `` : `
+      <div class="small text-muted mt-2">
+        Total: <b>${st.total ?? 0}</b> · Buenas: <b>${st.buenas ?? 0}</b> · Pend: <b>${st.pendientes ?? 0}</b> · Malas: <b>${st.malas ?? 0}</b>
+      </div>
+    `;
+
+    const barHtml = (pct === null)
+      ? `<div class="small text-muted mt-2">Sin datos para calcular % Bueno</div>`
+      : `
+        <div class="mt-2">
+          <div class="d-flex justify-content-between small">
+            <span class="text-muted">Calidad</span>
+            <span class="fw-semibold">${pct}% Bueno</span>
+          </div>
+          <div style="height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;">
+            <div style="width:${Math.max(0, Math.min(100, pct))}%;height:10px;background:${badge.color};"></div>
+          </div>
+        </div>
+      `;
 
     const html = `
       <div style="min-width:240px">
@@ -261,31 +306,13 @@
             <div class="fw-semibold mb-1">${p.name || "-"}</div>
             <div class="small text-muted">${kindLabel}${sub ? " · " + sub : ""}</div>
           </div>
-          <span style="
-            font-size:12px;
-            color:white;
-            background:${badge.color};
-            padding:4px 8px;
-            border-radius:999px;
-            white-space:nowrap;
-          ">${badge.label}</span>
+          <span style="font-size:12px;color:white;background:${badge.color};padding:4px 8px;border-radius:999px;white-space:nowrap;">
+            ${badge.label}
+          </span>
         </div>
 
-        ${
-          pct === null || pct === undefined
-            ? `<div class="small text-muted mt-2">Sin datos para calcular % Bueno</div>`
-            : `
-              <div class="mt-2">
-                <div class="d-flex justify-content-between small">
-                  <span class="text-muted">Calidad</span>
-                  <span class="fw-semibold">${pct}% Bueno</span>
-                </div>
-                <div style="height:10px; background:#e5e7eb; border-radius:999px; overflow:hidden;">
-                  <div style="width:${Math.max(0, Math.min(100, pct))}%; height:10px; background:${badge.color};"></div>
-                </div>
-              </div>
-            `
-        }
+        ${barHtml}
+        ${totalsHtml}
 
         <div class="d-grid gap-1 mt-3">
           ${p.detail_url ? `<a class="btn btn-sm btn-outline-primary" href="${p.detail_url}">Detalles</a>` : ""}
@@ -315,13 +342,22 @@
 
     features.forEach((f) => {
       const p = f.properties || {};
+      const isMovil = (p.is_movil === true || p.is_movil === "true");
+
       const kind =
         p.kind === "sector" ? "SECTOR" :
         p.kind === "ubicacion" ? "UBICACIÓN" :
-        p.kind === "lugar" ? "LUGAR" : "OTRO";
+        p.kind === "lugar" ? (isMovil ? "MÓVIL" : "LUGAR") :
+        "OTRO";
 
       const pct = getPctBuenasFromFeature(f);
       const badge = badgeForPct(pct);
+
+      const sub =
+        p.kind === "sector" ? "" :
+        p.kind === "ubicacion" ? (p.sector_name || "") :
+        p.kind === "lugar" ? (isMovil ? (p.sector_name || "") : (p.ubicacion_name || "")) :
+        "";
 
       const item = document.createElement("a");
       item.href = "javascript:void(0)";
@@ -330,15 +366,11 @@
         <div class="d-flex justify-content-between align-items-center gap-2">
           <div>
             <div class="fw-semibold">${p.name || "-"}</div>
-            <div class="small text-muted">${kind} · ${p.sector_name || p.ubicacion_name || ""}</div>
+            <div class="small text-muted">${kind}${sub ? " · " + sub : ""}</div>
           </div>
-          <span style="
-            font-size:12px;
-            color:white;
-            background:${badge.color};
-            padding:4px 8px;
-            border-radius:999px;
-          ">${badge.label}</span>
+          <span style="font-size:12px;color:white;background:${badge.color};padding:4px 8px;border-radius:999px;">
+            ${badge.label}
+          </span>
         </div>
       `;
       item.addEventListener("click", () => {
@@ -377,7 +409,7 @@
   function applyFilters() {
     if (!vistaSel || !sectorSel || !ubicSel) return;
 
-    const vista = vistaSel.value; // todo/sector/ubicacion/(lugar si lo agregas)
+    const vista = vistaSel.value; // todo/sector/ubicacion/lugar
     const sectorId = sectorSel.value;
     const ubicId = ubicSel.value;
 
@@ -395,12 +427,17 @@
 
     const filtered = (fc.features || []).filter((f) => {
       const p = f.properties || {};
+
       if (vista !== "todo" && p.kind !== vista) return false;
+
       if (sectorId && String(p.sector_id) !== String(sectorId)) return false;
 
-      // Ubicación filtro (si eliges una ubicación en el combo, muestro solo esa)
-      if (ubicId && p.kind === "ubicacion" && String(p.id) !== String(ubicId)) return false;
-      if (ubicId && p.kind === "sector") return false;
+      // ✅ Si eligen una Ubicación: mostrar SOLO esa ubicación + sus lugares
+      if (ubicId) {
+        if (p.kind === "sector") return false;
+        if (p.kind === "ubicacion" && String(p.id) !== String(ubicId)) return false;
+        if (p.kind === "lugar" && String(p.ubicacion_id || "") !== String(ubicId)) return false;
+      }
 
       return true;
     });
@@ -418,22 +455,22 @@
   }
 
   // =========================
-  // FETCH STATS (MISMO VIEW)
+  // FETCH STATS
   // =========================
   async function loadStats() {
     try {
-      const res = await fetch("stats/", {
-        headers: { "X-Requested-With": "XMLHttpRequest" },
-      });
+      const res = await fetch("stats/", { headers: { "X-Requested-With": "XMLHttpRequest" } });
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
 
       statsSector = data.sector || {};
       statsUbic = data.ubicacion || {};
+      statsLugar = data.lugar || data.lugares || {}; // ✅ NUEVO
     } catch (e) {
       console.error("No se pudieron cargar stats del mapa:", e);
       statsSector = {};
       statsUbic = {};
+      statsLugar = {};
     }
   }
 
@@ -443,15 +480,11 @@
   map.on("load", async () => {
     map.addSource("polys", { type: "geojson", data: fc });
 
-    // ✅ COLORES POR DEFECTO (SIN PCT) por kind:
-    // sector = teal
-    // ubicacion = azul
-    // lugar = MORADO (distinto)
     const fallbackFillByKind = [
       "case",
       ["==", ["get", "kind"], "sector"], "#06b6b9",
       ["==", ["get", "kind"], "ubicacion"], "#0d6efd",
-      ["==", ["get", "kind"], "lugar"], "#a855f7 ", // 👈 COLOR LUGAR (cambia aquí si quieres otro)
+      ["==", ["get", "kind"], "lugar"], "#a855f7",
       "#64748b"
     ];
 
@@ -459,11 +492,10 @@
       "case",
       ["==", ["get", "kind"], "sector"], "#0f172a",
       ["==", ["get", "kind"], "ubicacion"], "#0b5ed7",
-      ["==", ["get", "kind"], "lugar"], "#7c3aed", // 👈 BORDE LUGAR (cambia aquí si quieres otro)
+      ["==", ["get", "kind"], "lugar"], "#7c3aed",
       "#0f172a"
     ];
 
-    // fill (% bueno por feature-state)
     map.addLayer({
       id: "fill",
       type: "fill",
@@ -480,14 +512,12 @@
             ["interpolate", ["linear"], ["feature-state", "pct"], 50, "#facc15", 65, "#facc15"],
             ["interpolate", ["linear"], ["feature-state", "pct"], 0, "#7f1d1d", 49, "#f87171"],
           ],
-          // 👇 fallback cuando NO hay pct
           fallbackFillByKind,
         ],
         "fill-opacity": 0.28,
       },
     });
 
-    // line
     map.addLayer({
       id: "line",
       type: "line",
@@ -502,7 +532,6 @@
             [">=", ["feature-state", "pct"], 50], "#a16207",
             "#991b1b",
           ],
-          // 👇 fallback cuando NO hay pct
           fallbackLineByKind,
         ],
         "line-width": [
@@ -513,7 +542,6 @@
       },
     });
 
-    // labels
     map.addLayer({
       id: "labels",
       type: "symbol",

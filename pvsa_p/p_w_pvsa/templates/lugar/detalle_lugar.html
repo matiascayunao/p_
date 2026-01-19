@@ -1,73 +1,182 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container py-4">
+<div class="container-xxl py-4" style="max-width: 1280px;">
 
-  <div class="mb-3 d-flex gap-2">
-    {% if lugar.piso %}
-      <a href="{% url 'detalle_piso' piso_id=lugar.piso.id %}" class="btn btn-outline-secondary btn-sm">
-        &laquo; Volver a piso
+  <!-- Breadcrumb + acciones -->
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+    <div>
+      <nav aria-label="breadcrumb" class="small">
+        <ol class="breadcrumb mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'home' %}">Inicio</a></li>
+          <li class="breadcrumb-item">
+            <a href="{% url 'detalle_ubicacion' ubicacion_id=lugar.piso.ubicacion.id %}">{{ lugar.piso.ubicacion.ubicacion }}</a>
+          </li>
+          <li class="breadcrumb-item">
+            <a href="{% url 'detalle_piso' piso_id=lugar.piso.id %}">Piso {{ lugar.piso.piso }}</a>
+          </li>
+          <li class="breadcrumb-item active" aria-current="page">{{ lugar.nombre_del_lugar }}</li>
+        </ol>
+      </nav>
+
+      <h2 class="h4 fw-bold mb-1">{{ lugar.nombre_del_lugar }}</h2>
+      <div class="text-muted">
+        Sector: {{ lugar.piso.ubicacion.sector.sector }} ·
+        Ubicación: {{ lugar.piso.ubicacion.ubicacion }} ·
+        Piso: {{ lugar.piso.piso }} ·
+        Tipo: {{ lugar.lugar_tipo_lugar.tipo_de_lugar }}
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'detalle_piso' piso_id=lugar.piso.id %}">
+        Volver al piso
       </a>
-    {% else %}
-      <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-sm">&laquo; Home</a>
-    {% endif %}
+
+      <a class="btn btn-outline-primary" href="{% url 'editar_lugar' lugar_id=lugar.id %}">
+        Editar lugar
+      </a>
+
+      <a class="btn btn-outline-danger" href="{% url 'borrar_lugar' lugar_id=lugar.id %}">
+        Borrar lugar
+      </a>
+    </div>
   </div>
 
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-body">
-      <h2 class="mb-1">{{ lugar.nombre_del_lugar }}</h2>
-      <div class="text-muted">
-        Piso: {{ lugar.piso.piso }} |
-        Ubicación: {{ lugar.piso.ubicacion }} |
-        Sector: {{ lugar.piso.ubicacion.sector }} |
-        Tipo: {{ lugar.lugar_tipo_lugar }}
+  <!-- Resumen -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-lg-8">
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-3 p-md-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+              <div class="fw-semibold">Objetos en este lugar</div>
+              <div class="text-muted small">Listado de inventario asociado al lugar.</div>
+            </div>
+            <div class="d-flex gap-2">
+              <a class="btn btn-primary btn-sm" href="{% url 'crear_objeto_lugar' lugar_id=lugar.id %}">
+                + Agregar objeto
+              </a>
+              <a class="btn btn-outline-secondary btn-sm" href="{% url 'lista_objetos_lugar' %}?lugar={{ lugar.id }}">
+                Ver en listado general
+              </a>
+            </div>
+          </div>
+
+          <hr class="my-3">
+
+          <div class="d-flex flex-wrap gap-2">
+            <span class="badge rounded-pill text-bg-light border px-3 py-2">
+              Registros: <strong class="ms-1">{{ objetos|length }}</strong>
+            </span>
+
+            {% if lugar.geom %}
+              <span class="badge rounded-pill text-bg-success px-3 py-2">En mapa: Sí</span>
+              <a class="btn btn-outline-primary btn-sm" href="{% url 'mapa_lugar_editar_geom' lugar_id=lugar.id %}">
+                Editar polígono
+              </a>
+              <a class="btn btn-outline-danger btn-sm" href="{% url 'mapa_lugar_quitar_geom' lugar_id=lugar.id %}">
+                Quitar del mapa
+              </a>
+            {% else %}
+              <span class="badge rounded-pill text-bg-secondary px-3 py-2">En mapa: No</span>
+              <a class="btn btn-outline-primary btn-sm" href="{% url 'mapa_lugar_editar_geom' lugar_id=lugar.id %}">
+                Marcar en mapa
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel info -->
+    <div class="col-12 col-lg-4">
+      <div class="card border-0 shadow-sm rounded-4 h-100">
+        <div class="card-body p-3 p-md-4">
+          <div class="fw-semibold mb-1">Ubicación del lugar</div>
+          <div class="text-muted small mb-3">Contexto jerárquico para presentación.</div>
+
+          <ul class="list-group rounded-4 overflow-hidden">
+            <li class="list-group-item d-flex justify-content-between">
+              <span class="text-muted">Sector</span>
+              <strong>{{ lugar.piso.ubicacion.sector.sector }}</strong>
+            </li>
+            <li class="list-group-item d-flex justify-content-between">
+              <span class="text-muted">Ubicación</span>
+              <strong>{{ lugar.piso.ubicacion.ubicacion }}</strong>
+            </li>
+            <li class="list-group-item d-flex justify-content-between">
+              <span class="text-muted">Piso</span>
+              <strong>{{ lugar.piso.piso }}</strong>
+            </li>
+            <li class="list-group-item d-flex justify-content-between">
+              <span class="text-muted">Tipo</span>
+              <strong>{{ lugar.lugar_tipo_lugar.tipo_de_lugar }}</strong>
+            </li>
+          </ul>
+
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="d-flex align-items-center justify-content-between mb-2">
-    <h4 class="mb-0">Objetos en el lugar</h4>
-    <a class="btn btn-primary btn-sm" href="{% url 'crear_objeto_lugar' lugar_id=lugar.id %}">+ Agregar objeto</a>
-  </div>
-
-  <div class="card shadow-sm border-0">
+  <!-- Tabla -->
+  <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
     <div class="card-body p-0">
       {% if objetos %}
         <div class="table-responsive">
-          <table class="table align-middle mb-0">
-            <thead>
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
               <tr>
-                <th>Cantidad</th>
-                <th>Objeto</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th>Detalle</th>
-                <th>Fecha</th>
-                <th class="text-end">Acciones</th>
+                <th class="text-center" style="width:90px;">Cant.</th>
+                <th style="min-width:240px;">Objeto</th>
+                <th style="min-width:220px;">Tipo</th>
+                <th style="width:140px;">Estado</th>
+                <th style="min-width:220px;">Detalle</th>
+                <th style="width:120px;">Fecha</th>
+                <th class="text-end" style="width:220px;">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {% for o in objetos %}
               <tr>
-                <td>{{ o.cantidad }}</td>
-                <td>{{ o.tipo_de_objeto.objeto.nombre_del_objeto }}</td>
-                <td>{{ o.tipo_de_objeto }}</td>
+                <td class="text-center fw-semibold">{{ o.cantidad }}</td>
+
+                <td>
+                  <div class="fw-semibold">{{ o.tipo_de_objeto.objeto.nombre_del_objeto }}</div>
+                  <div class="text-muted small">
+                    Categoría: {{ o.tipo_de_objeto.objeto.objeto_categoria.nombre_de_categoria }}
+                  </div>
+                </td>
+
+                <td class="text-muted">
+                  {{ o.tipo_de_objeto.marca|default:"—" }} {{ o.tipo_de_objeto.material|default:"" }}
+                </td>
+
                 <td>
                   {% if o.estado == "B" %}
-                    <span class="badge text-bg-success">Bueno</span>|
+                    <span class="badge bg-success">Bueno</span>
                   {% elif o.estado == "P" %}
-                    <span class="badge text-bg-warning">Pendiente</span>
+                    <span class="badge bg-warning text-dark">Pendiente</span>
                   {% elif o.estado == "M" %}
-                    <span class="badge text-bg-danger">Malo</span>
+                    <span class="badge bg-danger">Malo</span>
                   {% else %}
-                    <span class="badge text-bg-secondary">{{ o.estado }}</span>
+                    <span class="badge bg-secondary">{{ o.estado }}</span>
                   {% endif %}
                 </td>
-                <td class="text-muted">{% if o.detalle %}{{ o.detalle }}{% else %}-{% endif %}</td>
-                <td>{{ o.fecha }}</td>
+
+                <td class="text-muted">
+                  {% if o.detalle %}{{ o.detalle }}{% else %}—{% endif %}
+                </td>
+
+                <td>{{ o.fecha|date:"d/m/Y" }}</td>
+
                 <td class="text-end">
-                  <a class="btn btn-outline-primary btn-sm" href="{% url 'detalle_objeto_lugar' objeto_lugar_id=o.id %}">Ver</a>
-                  <a class="btn btn-outline-secondary btn-sm" href="{% url 'editar_objeto_lugar' objeto_lugar_id=o.id %}">Editar</a>
-                  <a class="btn btn-outline-danger btn-sm" href="{% url 'borrar_objeto_lugar' objeto_lugar_id=o.id %}">Borrar</a>
+                  <a class="btn btn-outline-primary btn-sm"
+                     href="{% url 'detalle_objeto_lugar' objeto_lugar_id=o.id %}">Ver</a>
+                  <a class="btn btn-outline-secondary btn-sm"
+                     href="{% url 'editar_objeto_lugar' objeto_lugar_id=o.id %}">Editar</a>
+                  <a class="btn btn-outline-danger btn-sm"
+                     href="{% url 'borrar_objeto_lugar' objeto_lugar_id=o.id %}">Borrar</a>
                 </td>
               </tr>
               {% endfor %}
@@ -76,15 +185,12 @@
         </div>
       {% else %}
         <div class="p-4">
-          <div class="alert alert-secondary mb-0">Este lugar no tiene objetos registrados.</div>
+          <div class="alert alert-secondary mb-0 rounded-4">
+            Este lugar no tiene objetos registrados.
+          </div>
         </div>
       {% endif %}
     </div>
-  </div>
-
-  <div class="mt-3 d-flex gap-2">
-    <a class="btn btn-outline-primary" href="{% url 'editar_lugar' lugar_id=lugar.id %}">Editar lugar</a>
-    <a class="btn btn-outline-danger" href="{% url 'borrar_lugar' lugar_id=lugar.id %}">Borrar lugar</a>
   </div>
 
 </div>

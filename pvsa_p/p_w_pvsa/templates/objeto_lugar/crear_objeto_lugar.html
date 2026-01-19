@@ -1,26 +1,27 @@
+{# templates/objeto_lugar/crear_objeto_lugar.html #}
 {% extends "base.html" %}
-
 {% block content %}
-<div class="container py-5" style="max-width: 720px;">
+<div class="container py-5" style="max-width: 820px;">
 
-  <div class="mb-3">
+  <div class="mb-3 d-flex justify-content-between align-items-center gap-2">
     <a href="{% url 'detalle_lugar' lugar_id=lugar.id %}" class="btn btn-outline-secondary btn-sm">
       &laquo; Volver al lugar
     </a>
+    <span class="badge rounded-pill text-bg-light border">
+      Lugar: <strong class="ms-1">{{ lugar.nombre_del_lugar }}</strong>
+    </span>
   </div>
 
-  <div class="card shadow-sm border-0">
-    <div class="card-body p-4">
+  <div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4 p-md-5">
       <h3 class="mb-1">Agregar objeto al lugar</h3>
-      <p class="text-muted mb-4">
-        Lugar: <strong>{{ lugar.nombre_del_lugar }}</strong>
-      </p>
+      <p class="text-muted mb-4">Selecciona el tipo (marca/material) y define cantidad/estado.</p>
 
       <form method="post" novalidate>
         {% csrf_token %}
 
         {% if form.non_field_errors %}
-          <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+          <div class="alert alert-danger">{{ form.non_field_errors|striptags }}</div>
         {% endif %}
 
         <div class="mb-3">
@@ -40,6 +41,8 @@
           </select>
           {% if form.tipo_de_objeto.errors %}
             <div class="invalid-feedback">{{ form.tipo_de_objeto.errors|striptags }}</div>
+          {% else %}
+            <div class="form-text">Este combo representa Objeto + Marca + Material.</div>
           {% endif %}
         </div>
 
@@ -53,6 +56,7 @@
               value="{{ form.cantidad.value|default_if_none:'' }}"
               class="form-control {% if form.cantidad.errors %}is-invalid{% endif %}"
               placeholder="Ej: 10"
+              min="0"
               required
             >
             {% if form.cantidad.errors %}
@@ -81,7 +85,7 @@
           </div>
         </div>
 
-        <div class="mt-3 mb-3">
+        <div class="mt-3 mb-4">
           <label class="form-label" for="{{ form.detalle.id_for_label }}">Detalle (opcional)</label>
           <input
             type="text"
@@ -96,12 +100,11 @@
           {% endif %}
         </div>
 
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2">
           <button class="btn btn-primary" type="submit">Guardar</button>
           <a class="btn btn-outline-secondary" href="{% url 'detalle_lugar' lugar_id=lugar.id %}">Cancelar</a>
         </div>
       </form>
-
     </div>
   </div>
 </div>

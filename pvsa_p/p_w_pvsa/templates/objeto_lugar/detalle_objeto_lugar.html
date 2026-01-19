@@ -5,7 +5,6 @@
 {% block content %}
 <div class="container-xxl py-4" style="max-width: 1150px;">
 
-  <!-- Top bar -->
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
     <div class="d-flex flex-wrap gap-2">
       {% if objeto_lugar.lugar %}
@@ -26,13 +25,20 @@
       <a class="btn btn-outline-primary btn-sm" href="{% url 'editar_objeto_lugar' objeto_lugar_id=objeto_lugar.id %}">
         Editar
       </a>
-      <a class="btn btn-outline-danger btn-sm" href="{% url 'borrar_objeto_lugar' objeto_lugar_id=objeto_lugar.id %}">
+
+      <button
+        type="button"
+        class="btn btn-outline-danger btn-sm"
+        data-bs-toggle="modal"
+        data-bs-target="#confirmDeleteModal"
+        data-delete-url="{% url 'borrar_objeto_lugar' objeto_lugar_id=objeto_lugar.id %}"
+        data-delete-name="{% if objeto_lugar.tipo_de_objeto and objeto_lugar.tipo_de_objeto.objeto %}{{ objeto_lugar.tipo_de_objeto.objeto.nombre_del_objeto|escape }}{% else %}Registro{% endif %}"
+      >
         Borrar
-      </a>
+      </button>
     </div>
   </div>
 
-  <!-- Breadcrumb / ubicación -->
   <div class="mb-3">
     <div class="text-muted small">Ruta</div>
     <div class="fw-semibold">
@@ -50,12 +56,10 @@
     </div>
   </div>
 
-  <!-- Header / resumen actual -->
   <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-3">
     <div class="card-body p-4">
       <div class="row g-4 align-items-start">
 
-        <!-- Identificación del objeto -->
         <div class="col-12 col-lg-6">
           <div class="text-muted small mb-1">Objeto registrado</div>
 
@@ -112,7 +116,6 @@
           </div>
         </div>
 
-        <!-- Estado actual (bien claro) -->
         <div class="col-12 col-lg-6">
           <div class="text-muted small mb-2">Estado actual</div>
 
@@ -139,8 +142,7 @@
           <div class="alert alert-light border rounded-4 mb-0">
             <div class="fw-semibold mb-1">Cómo leer esta pantalla</div>
             <div class="small text-muted">
-              Arriba se muestra el estado actual del objeto en este lugar. Abajo verás el histórico con estados anteriores
-              que se guardan automáticamente cuando se edita la cantidad, estado o detalle.
+              Arriba se muestra el estado actual del objeto en este lugar. Abajo verás el histórico con estados anteriores.
             </div>
           </div>
         </div>
@@ -149,7 +151,6 @@
     </div>
   </div>
 
-  <!-- Históricos -->
   <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
     <div class="card-header bg-white border-0 p-3 p-md-4">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -180,7 +181,6 @@
               {% for h in historicos %}
               <tr>
                 <td class="fw-semibold">{{ h.cantidad_anterior }}</td>
-
                 <td>
                   {% with e=h.get_estado_anterior_display %}
                     {% if e == "Bueno" %}
@@ -192,21 +192,12 @@
                     {% endif %}
                   {% endwith %}
                 </td>
-
                 <td class="text-muted">
-                  {% if h.detalle_anterior %}
-                    {{ h.detalle_anterior }}
-                  {% else %}
-                    —
-                  {% endif %}
+                  {% if h.detalle_anterior %}{{ h.detalle_anterior }}{% else %}—{% endif %}
                 </td>
-
                 <td>{{ h.fecha_anterior|date:"d/m/Y" }}</td>
-
                 <td class="text-end">
-                  <a class="btn btn-outline-primary btn-sm" href="{% url 'detalle_historico' historico_id=h.id %}">
-                    Ver
-                  </a>
+                  <a class="btn btn-outline-primary btn-sm" href="{% url 'detalle_historico' historico_id=h.id %}">Ver</a>
                 </td>
               </tr>
               {% endfor %}
@@ -215,19 +206,82 @@
         </div>
 
         <div class="p-3 p-md-4 border-top bg-white">
-          <div class="small text-muted">
-            Nota: el histórico se crea automáticamente cuando cambias cantidad, estado o detalle del objeto.
-          </div>
+          <div class="small text-muted">Nota: el histórico se crea automáticamente cuando cambias cantidad, estado o detalle.</div>
         </div>
       {% else %}
         <div class="p-4">
-          <div class="alert alert-secondary mb-0 rounded-4">
-            No hay registros históricos para este objeto en este lugar.
-          </div>
+          <div class="alert alert-secondary mb-0 rounded-4">No hay registros históricos para este objeto en este lugar.</div>
         </div>
       {% endif %}
     </div>
   </div>
 
+  {# ===== MODAL CONFIRMAR BORRADO ===== #}
+  <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirmar borrado</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2">¿Seguro que quieres borrar:</div>
+          <div class="fw-semibold" id="deleteTargetName">—</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+          <form method="post" id="deleteForm" action="#">
+            {% csrf_token %}
+            <button class="btn btn-danger" type="submit">Sí, borrar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ===== MODAL BLOQUEADO (RELACIONES) ===== #}
+  <div class="modal fade" id="blockedDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title text-danger">No se puede borrar</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          Este elemento aún tiene cosas ligadas. Primero elimina o desvincula lo relacionado y vuelve a intentar.
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const confirmModal = document.getElementById("confirmDeleteModal");
+  const deleteForm = document.getElementById("deleteForm");
+  const nameEl = document.getElementById("deleteTargetName");
+
+  if (confirmModal) {
+    confirmModal.addEventListener("show.bs.modal", function (event) {
+      const btn = event.relatedTarget;
+      const url = btn?.getAttribute("data-delete-url") || "#";
+      const name = btn?.getAttribute("data-delete-name") || "—";
+      if (deleteForm) deleteForm.action = url;
+      if (nameEl) nameEl.textContent = name;
+    });
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("blocked") === "1") {
+    const blocked = document.getElementById("blockedDeleteModal");
+    if (blocked && typeof bootstrap !== "undefined") {
+      new bootstrap.Modal(blocked).show();
+    }
+  }
+});
+</script>
 {% endblock %}

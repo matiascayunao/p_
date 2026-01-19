@@ -1,16 +1,35 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container py-5" style="max-width:720px;">
-  <div class="card shadow-sm border-0">
-    <div class="card-body p-4">
-      <h3 class="mb-1">Crear tipo de objeto</h3>
-      <p class="text-muted mb-4">Asocia el objeto y define marca/material.</p>
+<div class="container-xxl py-4" style="max-width: 980px;">
+
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+    <div>
+      <nav aria-label="breadcrumb" class="small">
+        <ol class="breadcrumb mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'home' %}">Inicio</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'lista_tipos_objeto' %}">Tipos de objeto</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Crear</li>
+        </ol>
+      </nav>
+      <h2 class="h4 fw-bold mb-1">Crear tipo de objeto</h2>
+      <div class="text-muted">Asocia un objeto y define marca/material si aplica.</div>
+    </div>
+
+    <a class="btn btn-outline-secondary" href="{% url 'lista_tipos_objeto' %}">Volver</a>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-3 p-md-4">
 
       <form method="post" novalidate>
         {% csrf_token %}
 
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger rounded-4">{{ form.non_field_errors }}</div>
+        {% endif %}
+
         <div class="mb-3">
-          <label class="form-label" for="{{ form.objeto.id_for_label }}">Objeto</label>
+          <label class="form-label small text-muted mb-1" for="{{ form.objeto.id_for_label }}">Objeto</label>
           <select
             name="{{ form.objeto.name }}"
             id="{{ form.objeto.id_for_label }}"
@@ -23,16 +42,16 @@
                 {{ option.1 }}
               </option>
             {% endfor %}
-            
           </select>
           {% if form.objeto.errors %}
             <div class="invalid-feedback">{{ form.objeto.errors|striptags }}</div>
           {% endif %}
+          <div class="form-text">Este es el “objeto base”. Luego se diferencia por marca/material.</div>
         </div>
 
         <div class="row g-3">
           <div class="col-md-6">
-            <label class="form-label" for="{{ form.marca.id_for_label }}">Marca</label>
+            <label class="form-label small text-muted mb-1" for="{{ form.marca.id_for_label }}">Marca (opcional)</label>
             <input
               type="text"
               name="{{ form.marca.name }}"
@@ -40,7 +59,6 @@
               value="{{ form.marca.value|default_if_none:'' }}"
               class="form-control {% if form.marca.errors %}is-invalid{% endif %}"
               placeholder="Ej: Siemens"
-              required
             >
             {% if form.marca.errors %}
               <div class="invalid-feedback">{{ form.marca.errors|striptags }}</div>
@@ -48,7 +66,7 @@
           </div>
 
           <div class="col-md-6">
-            <label class="form-label" for="{{ form.material.id_for_label }}">Material</label>
+            <label class="form-label small text-muted mb-1" for="{{ form.material.id_for_label }}">Material (opcional)</label>
             <input
               type="text"
               name="{{ form.material.name }}"
@@ -56,7 +74,6 @@
               value="{{ form.material.value|default_if_none:'' }}"
               class="form-control {% if form.material.errors %}is-invalid{% endif %}"
               placeholder="Ej: Acero inoxidable"
-              required
             >
             {% if form.material.errors %}
               <div class="invalid-feedback">{{ form.material.errors|striptags }}</div>
@@ -64,13 +81,17 @@
           </div>
         </div>
 
-        <div class="d-flex gap-2 mt-4">
+        <hr class="my-4">
+
+        <div class="d-flex flex-wrap gap-2">
           <button class="btn btn-primary" type="submit">Guardar</button>
-          <a class="btn btn-outline-secondary" href="{% url 'home' %}">Cancelar</a>
+          <a class="btn btn-outline-secondary" href="{% url 'lista_tipos_objeto' %}">Cancelar</a>
         </div>
 
       </form>
+
     </div>
   </div>
+
 </div>
 {% endblock %}
