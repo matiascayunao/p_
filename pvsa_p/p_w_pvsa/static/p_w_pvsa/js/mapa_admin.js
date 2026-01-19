@@ -1,11 +1,9 @@
 /* static/p_w_pvsa/js/mapa_admin.js */
 (function () {
-  // =========================
-  // CONFIG
-  // =========================
+  if (typeof maplibregl === "undefined") return;
+
   const MAX_ZOOM = 19;
 
-  // ✅ LÍMITES (AJUSTA A TU CUADRADO BLANCO)
   const LIMIT_BOUNDS = [
     [-71.5100, -32.7800], // SW
     [-71.4500, -32.7300], // NE
@@ -28,34 +26,26 @@
     layers: [{ id: "sat", type: "raster", source: "sat" }],
   };
 
-  // =========================
-  // DATA: FeatureCollection desde template
-  // =========================
   const el = document.getElementById("mapa-data");
   const fc0 = el ? JSON.parse(el.textContent) : { type: "FeatureCollection", features: [] };
 
-  // 🔥 IDs únicos para feature-state
+  // ids estables para feature-state
   const fc = {
     type: "FeatureCollection",
-    features: (fc0.features || [])
-      .filter(f => !!f && !!f.geometry)
-      .map((f) => {
-        const p = f.properties || {};
-        const baseId =
-          p.kind === "sector"
-            ? `sector-${p.sector_id || p.id}`
-            : p.kind === "ubicacion"
-            ? `ubicacion-${p.id}`
-            : p.kind === "lugar"
-            ? `lugar-${p.id}`
-            : `x-${Math.random().toString(16).slice(2)}`;
-        return { ...f, id: baseId };
-      }),
+    features: (fc0.features || []).map((f) => {
+      const p = f.properties || {};
+      const id =
+        p.kind === "sector"
+          ? `sector-${p.sector_id || p.id}`
+          : p.kind === "ubicacion"
+          ? `ubicacion-${p.id}`
+          : p.kind === "lugar"
+          ? `lugar-${p.id}`
+          : `x-${Math.random().toString(16).slice(2)}`;
+      return { ...f, id };
+    }),
   };
 
-  // =========================
-  // MAP INIT
-  // =========================
   const map = new maplibregl.Map({
     container: "mapaAdmin",
     style: STYLE,
@@ -69,9 +59,6 @@
   map.addControl(new maplibregl.NavigationControl(), "top-right");
   map.setMaxBounds(LIMIT_BOUNDS_OBJ);
 
-  // =========================
-  // DOM
-  // =========================
   const vistaSel = document.getElementById("mapVista");
   const sectorSel = document.getElementById("mapSector");
   const ubicSel = document.getElementById("mapUbicacion");
@@ -80,14 +67,10 @@
 
   let popup = null;
 
-  // stats cache (desde fetch)
   let statsSector = {};
   let statsUbic = {};
-  let statsLugar = {}; // ✅ NUEVO
+  let statsLugar = {};
 
-  // =========================
-  // UTILS
-  // =========================
   function clamp(n, a, b) {
     return Math.max(a, Math.min(b, n));
   }
@@ -140,7 +123,6 @@
     return { label: `${pct}% Bueno`, color: colorForPct(pct) };
   }
 
-  // ========= Geom helpers (Polygon + MultiPolygon) =========
   function coordsFromGeom(geom) {
     if (!geom) return [];
     if (geom.type === "Polygon") {
@@ -202,7 +184,6 @@
     ];
   }
 
-  // ========= bounds safe-fit =========
   function intersectBbox(bb, limit) {
     const sw = [
       Math.max(bb[0][0], limit[0][0]),
@@ -227,77 +208,34 @@
     safeFitBounds(bb, 60, MAX_ZOOM);
   }
 
-  // =========================
-  // STATS helpers
-  // =========================
-  function asNumOrNull(x) {
-    const n = Number(x);
-    return isFinite(n) ? n : null;
-  }
-
-  function getStatsForFeature(f) {
-    const p = f.properties || {};
-    if (p.kind === "sector") return statsSector[String(p.sector_id || p.id)] || null;
-    if (p.kind === "ubicacion") return statsUbic[String(p.id)] || null;
-    if (p.kind === "lugar") return statsLugar[String(p.id)] || null;
-    return null;
-  }
-
   function getPctBuenasFromFeature(f) {
     const p = f.properties || {};
-    const st = getStatsForFeature(f);
-    if (st && st.pct_buenas !== undefined && st.pct_buenas !== null) return asNumOrNull(st.pct_buenas);
-
-    // fallback si el geojson ya trae pct
-    if (p.pct_buenas !== undefined && p.pct_buenas !== null) return asNumOrNull(p.pct_buenas);
-    if (p.pct !== undefined && p.pct !== null) return asNumOrNull(p.pct);
-
+    if (p.kind === "sector") return statsSector[String(p.sector_id || p.id)]?.pct_buenas ?? null;
+    if (p.kind === "ubicacion") return statsUbic[String(p.id)]?.pct_buenas ?? null;
+    if (p.kind === "lugar") return statsLugar[String(p.id)]?.pct_buenas ?? null;
     return null;
   }
 
-  // =========================
-  // POPUP
-  // =========================
   function popupForFeature(f, lngLat) {
     const p = f.properties || {};
-    const st = getStatsForFeature(f) || {};
     const pct = getPctBuenasFromFeature(f);
     const badge = badgeForPct(pct);
 
-    const isMovil = (p.is_movil === true || p.is_movil === "true");
     const kindLabel =
       p.kind === "sector" ? "SECTOR" :
       p.kind === "ubicacion" ? "UBICACIÓN" :
-      p.kind === "lugar" ? (isMovil ? "CONTENEDOR / MÓVIL" : "LUGAR") :
+      p.kind === "lugar" ? (p.is_movil ? "CONTENEDOR / MÓVIL" : "LUGAR") :
       (p.kind || "").toUpperCase();
 
     let sub = "";
     if (p.kind === "ubicacion") sub = p.sector_name || "";
     if (p.kind === "lugar") {
-      if (isMovil) sub = `Sector ${p.sector_name || ""}`;
-      else sub = `${p.ubicacion_name ? (p.ubicacion_name + " · ") : ""}Piso ${p.piso ?? "-"}`;
+      if (p.is_movil) {
+        sub = `Sector ${p.sector_name || ""}`;
+      } else {
+        sub = `${p.ubicacion_name ? (p.ubicacion_name + " · ") : ""}Piso ${p.piso ?? "-"}`;
+      }
     }
-
-    const totalsOk = (st.total !== undefined && st.total !== null);
-    const totalsHtml = !totalsOk ? `` : `
-      <div class="small text-muted mt-2">
-        Total: <b>${st.total ?? 0}</b> · Buenas: <b>${st.buenas ?? 0}</b> · Pend: <b>${st.pendientes ?? 0}</b> · Malas: <b>${st.malas ?? 0}</b>
-      </div>
-    `;
-
-    const barHtml = (pct === null)
-      ? `<div class="small text-muted mt-2">Sin datos para calcular % Bueno</div>`
-      : `
-        <div class="mt-2">
-          <div class="d-flex justify-content-between small">
-            <span class="text-muted">Calidad</span>
-            <span class="fw-semibold">${pct}% Bueno</span>
-          </div>
-          <div style="height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;">
-            <div style="width:${Math.max(0, Math.min(100, pct))}%;height:10px;background:${badge.color};"></div>
-          </div>
-        </div>
-      `;
 
     const html = `
       <div style="min-width:240px">
@@ -306,13 +244,31 @@
             <div class="fw-semibold mb-1">${p.name || "-"}</div>
             <div class="small text-muted">${kindLabel}${sub ? " · " + sub : ""}</div>
           </div>
-          <span style="font-size:12px;color:white;background:${badge.color};padding:4px 8px;border-radius:999px;white-space:nowrap;">
-            ${badge.label}
-          </span>
+          <span style="
+            font-size:12px;
+            color:white;
+            background:${badge.color};
+            padding:4px 8px;
+            border-radius:999px;
+            white-space:nowrap;
+          ">${badge.label}</span>
         </div>
 
-        ${barHtml}
-        ${totalsHtml}
+        ${
+          pct === null || pct === undefined
+            ? `<div class="small text-muted mt-2">Sin datos para calcular % Bueno</div>`
+            : `
+              <div class="mt-2">
+                <div class="d-flex justify-content-between small">
+                  <span class="text-muted">Calidad</span>
+                  <span class="fw-semibold">${pct}% Bueno</span>
+                </div>
+                <div style="height:10px; background:#e5e7eb; border-radius:999px; overflow:hidden;">
+                  <div style="width:${Math.max(0, Math.min(100, pct))}%; height:10px; background:${badge.color};"></div>
+                </div>
+              </div>
+            `
+        }
 
         <div class="d-grid gap-1 mt-3">
           ${p.detail_url ? `<a class="btn btn-sm btn-outline-primary" href="${p.detail_url}">Detalles</a>` : ""}
@@ -328,9 +284,6 @@
       .addTo(map);
   }
 
-  // =========================
-  // LISTA LATERAL
-  // =========================
   function renderList(features) {
     if (!lista) return;
 
@@ -342,12 +295,11 @@
 
     features.forEach((f) => {
       const p = f.properties || {};
-      const isMovil = (p.is_movil === true || p.is_movil === "true");
 
       const kind =
         p.kind === "sector" ? "SECTOR" :
         p.kind === "ubicacion" ? "UBICACIÓN" :
-        p.kind === "lugar" ? (isMovil ? "MÓVIL" : "LUGAR") :
+        p.kind === "lugar" ? (p.is_movil ? "MÓVIL" : "LUGAR") :
         "OTRO";
 
       const pct = getPctBuenasFromFeature(f);
@@ -356,7 +308,7 @@
       const sub =
         p.kind === "sector" ? "" :
         p.kind === "ubicacion" ? (p.sector_name || "") :
-        p.kind === "lugar" ? (isMovil ? (p.sector_name || "") : (p.ubicacion_name || "")) :
+        p.kind === "lugar" ? (p.is_movil ? (p.sector_name || "") : (p.ubicacion_name || "")) :
         "";
 
       const item = document.createElement("a");
@@ -368,9 +320,13 @@
             <div class="fw-semibold">${p.name || "-"}</div>
             <div class="small text-muted">${kind}${sub ? " · " + sub : ""}</div>
           </div>
-          <span style="font-size:12px;color:white;background:${badge.color};padding:4px 8px;border-radius:999px;">
-            ${badge.label}
-          </span>
+          <span style="
+            font-size:12px;
+            color:white;
+            background:${badge.color};
+            padding:4px 8px;
+            border-radius:999px;
+          ">${badge.label}</span>
         </div>
       `;
       item.addEventListener("click", () => {
@@ -381,9 +337,6 @@
     });
   }
 
-  // =========================
-  // FEATURE-STATE (% bueno)
-  // =========================
   function setPctStates(features) {
     (fc.features || []).forEach((f) => {
       try {
@@ -403,17 +356,13 @@
     });
   }
 
-  // =========================
-  // FILTROS
-  // =========================
   function applyFilters() {
     if (!vistaSel || !sectorSel || !ubicSel) return;
 
-    const vista = vistaSel.value; // todo/sector/ubicacion/lugar
+    const vista = vistaSel.value; // todo/sector/ubicacion
     const sectorId = sectorSel.value;
     const ubicId = ubicSel.value;
 
-    // filtrar opciones de ubicacion por sector
     Array.from(ubicSel.options).forEach((opt) => {
       const s = opt.getAttribute("data-sector");
       if (!s) return;
@@ -432,7 +381,7 @@
 
       if (sectorId && String(p.sector_id) !== String(sectorId)) return false;
 
-      // ✅ Si eligen una Ubicación: mostrar SOLO esa ubicación + sus lugares
+      // si eligen una ubicación: mostrar esa ubicación + sus lugares (incluye móviles si pertenecen a esa ubicación especial)
       if (ubicId) {
         if (p.kind === "sector") return false;
         if (p.kind === "ubicacion" && String(p.id) !== String(ubicId)) return false;
@@ -454,18 +403,17 @@
     safeFitBounds(bb, 60, MAX_ZOOM);
   }
 
-  // =========================
-  // FETCH STATS
-  // =========================
   async function loadStats() {
     try {
-      const res = await fetch("stats/", { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      const res = await fetch("stats/", {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+      });
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
 
       statsSector = data.sector || {};
       statsUbic = data.ubicacion || {};
-      statsLugar = data.lugar || data.lugares || {}; // ✅ NUEVO
+      statsLugar = data.lugar || {};
     } catch (e) {
       console.error("No se pudieron cargar stats del mapa:", e);
       statsSector = {};
@@ -474,9 +422,6 @@
     }
   }
 
-  // =========================
-  // MAP LOAD
-  // =========================
   map.on("load", async () => {
     map.addSource("polys", { type: "geojson", data: fc });
 

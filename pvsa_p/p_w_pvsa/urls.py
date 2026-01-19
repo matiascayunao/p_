@@ -101,16 +101,16 @@ urlpatterns = [
     # MAPA (ADMIN + EDITOR)
     # =========================
     path("mapa/", views.mapa_admin, name="mapa_admin"),
+    path("mapa/stats/",views.mapa_admin_stats, name="mapa_admin_stats"),
     path("mapa/crear/", views.mapa_editor_crear, name="mapa_crear"),
     path("mapa/guardar/", views.mapa_guardar, name="mapa_guardar"),
 
     path("mapa/sector/<int:sector_id>/", views.mapa_sector_detalle, name="mapa_sector_detalle"),
-    path("mapa/ubicacion/<int:ubicacion_id>/", views.mapa_ubicacion_detalle, name="mapa_ubicacion_detalle"),
-
     path("mapa/sector/<int:sector_id>/editar-geom/", views.mapa_sector_editar_geom, name="mapa_sector_editar_geom"),
-    path("mapa/ubicacion/<int:ubicacion_id>/editar-geom/", views.mapa_ubicacion_editar_geom, name="mapa_ubicacion_editar_geom"),
-
     path("mapa/sector/<int:sector_id>/quitar-geom/", views.mapa_sector_quitar_geom, name="mapa_sector_quitar_geom"),
+
+    path("mapa/ubicacion/<int:ubicacion_id>/", views.mapa_ubicacion_detalle, name="mapa_ubicacion_detalle"),
+    path("mapa/ubicacion/<int:ubicacion_id>/editar-geom/", views.mapa_ubicacion_editar_geom, name="mapa_ubicacion_editar_geom"),
     path("mapa/ubicacion/<int:ubicacion_id>/quitar-geom/", views.mapa_ubicacion_quitar_geom, name="mapa_ubicacion_quitar_geom"),
 
     path("carga-masiva", views.carga_masiva, name="carga_masiva"),
@@ -120,6 +120,6 @@ urlpatterns = [
     path("mapa/lugar/<int:lugar_id>/editar/", views.mapa_lugar_editar_geom, name="mapa_lugar_editar_geom"),
     path("mapa/lugar/<int:lugar_id>/quitar/", views.mapa_lugar_quitar_geom, name="mapa_lugar_quitar_geom"),
 
-    path("mapa/stats/",views.mapa_admin_stats, name="mapa_admin_stats"),
+
 
 ]

@@ -41,7 +41,6 @@
   map.setMaxBounds(LIMIT_BOUNDS_OBJ);
   map.addControl(new maplibregl.NavigationControl(), "top-right");
 
-  // ========= DOM =========
   const btnMarcar = document.getElementById("btnMarcar");
   const btnDeshacer = document.getElementById("btnDeshacer");
   const btnLimpiar = document.getElementById("btnLimpiar");
@@ -63,7 +62,7 @@
   const bloqueUbicacion = document.getElementById("bloqueUbicacion");
   const bloqueLugar = document.getElementById("bloqueLugar");
 
-  // ✅ NUEVO BLOQUE: lugar_sector
+  // lugar_sector
   const bloqueLugarSector = document.getElementById("bloqueLugarSector");
   const lugarSectorSector = document.getElementById("lugarSectorSector");
   const lugarSectorExistente = document.getElementById("lugarSectorExistente");
@@ -71,7 +70,7 @@
   const sectorParaUbicacion = document.getElementById("sectorParaUbicacion");
   const ubicacionExistente = document.getElementById("ubicacionExistente");
 
-  // Lugar UI
+  // Lugar normal
   const lugarUbicacion = document.getElementById("lugarUbicacion");
   const lugarPiso = document.getElementById("lugarPiso");
   const lugarExistente = document.getElementById("lugarExistente");
@@ -80,7 +79,6 @@
   const URL_PISOS = cfg?.dataset.urlPisos || "";
   const URL_LUGARES = cfg?.dataset.urlLugares || "";
 
-  // hidden para editar
   const parentSectorId = document.getElementById("parentSectorId");
   const parentUbicacionId = document.getElementById("parentUbicacionId");
   const accion = document.querySelector('input[name="accion"]')?.value || "crear";
@@ -92,7 +90,6 @@
     if (modalError) modalError.show();
   }
 
-  // ========= DATA (mapa-data) =========
   const dataEl = document.getElementById("mapa-data");
   const fc0 = dataEl ? JSON.parse(dataEl.textContent) : { type: "FeatureCollection", features: [] };
 
@@ -101,20 +98,19 @@
 
   (fc0.features || []).forEach((f) => {
     const p = f.properties || {};
-    const kind = p.kind;
+    if (!f.geometry) return;
 
-    if (kind === "sector") {
+    if (p.kind === "sector") {
       const sid = String(p.id || p.sector_id || "");
-      if (sid && f.geometry) sectorGeomById[sid] = f.geometry;
+      if (sid) sectorGeomById[sid] = f.geometry;
     }
 
-    if (kind === "ubicacion") {
+    if (p.kind === "ubicacion") {
       const uid = String(p.id || "");
-      if (uid && f.geometry) ubicGeomById[uid] = f.geometry;
+      if (uid) ubicGeomById[uid] = f.geometry;
     }
   });
 
-  // ========= Overlay AMARILLO =========
   function buildSavedFC() {
     const eid = String(editarId || "");
     const et = String(editarTipo || "");
@@ -172,7 +168,18 @@
     }
   }
 
-  // ========= Mostrar padre en editar =========
+  function setParentGeom(geom) {
+    if (!geom) return;
+
+    if (!map.getSource("parent")) {
+      map.addSource("parent", { type: "geojson", data: { type: "Feature", geometry: geom, properties: {} } });
+      map.addLayer({ id: "parent-line", type: "line", source: "parent", paint: { "line-color": "#00ffb7", "line-width": 3 } });
+      map.addLayer({ id: "parent-fill", type: "fill", source: "parent", paint: { "fill-color": "#00ffb7", "fill-opacity": 0.05 } });
+    } else {
+      map.getSource("parent").setData({ type: "Feature", geometry: geom, properties: {} });
+    }
+  }
+
   function drawParentIfEdit() {
     let parentGeom = null;
 
@@ -181,10 +188,12 @@
         const sid = parentSectorId?.value || "";
         parentGeom = sectorGeomById[String(sid)] || null;
       }
+
       if (editarTipo === "lugar") {
         const uid = parentUbicacionId?.value || "";
         parentGeom = ubicGeomById[String(uid)] || null;
 
+        // móvil: si no hay ubicación geom, usar sector padre
         if (!parentGeom) {
           const sid = parentSectorId?.value || "";
           parentGeom = sectorGeomById[String(sid)] || null;
@@ -192,29 +201,19 @@
       }
     }
 
-    if (!parentGeom) return;
-
-    if (!map.getSource("parent")) {
-      map.addSource("parent", { type: "geojson", data: { type: "Feature", geometry: parentGeom, properties: {} } });
-      map.addLayer({ id: "parent-line", type: "line", source: "parent", paint: { "line-color": "#00ffb7", "line-width": 3 } });
-      map.addLayer({ id: "parent-fill", type: "fill", source: "parent", paint: { "fill-color": "#00ffb7", "fill-opacity": 0.05 } });
-    } else {
-      map.getSource("parent").setData({ type: "Feature", geometry: parentGeom, properties: {} });
-    }
+    if (parentGeom) setParentGeom(parentGeom);
   }
 
-  // ========= Bloques del modal =========
   function updateBloques() {
     if (!tipoRegistro) return;
     const v = tipoRegistro.value;
 
-    if (bloqueSector) bloqueSector.style.display = (v === "sector") ? "" : "none";
-    if (bloqueUbicacion) bloqueUbicacion.style.display = (v === "ubicacion") ? "" : "none";
-    if (bloqueLugar) bloqueLugar.style.display = (v === "lugar") ? "" : "none";
-    if (bloqueLugarSector) bloqueLugarSector.style.display = (v === "lugar_sector") ? "" : "none";
+    if (bloqueSector) bloqueSector.style.display = v === "sector" ? "" : "none";
+    if (bloqueUbicacion) bloqueUbicacion.style.display = v === "ubicacion" ? "" : "none";
+    if (bloqueLugar) bloqueLugar.style.display = v === "lugar" ? "" : "none";
+    if (bloqueLugarSector) bloqueLugarSector.style.display = v === "lugar_sector" ? "" : "none";
   }
 
-  // ========= filtro ubicaciones por sector =========
   function filterUbicacionesBySector() {
     if (!sectorParaUbicacion || !ubicacionExistente) return;
     const sid = sectorParaUbicacion.value;
@@ -231,7 +230,6 @@
     }
   }
 
-  // ✅ filtro lugares móviles por sector
   function filterLugaresMovilesBySector() {
     if (!lugarSectorSector || !lugarSectorExistente) return;
     const sid = lugarSectorSector.value;
@@ -239,16 +237,19 @@
     Array.from(lugarSectorExistente.options).forEach((opt) => {
       const s = opt.getAttribute("data-sector");
       if (!s) return;
-      opt.hidden = sid ? (s !== sid) : false;
+      opt.hidden = sid ? s !== sid : false;
     });
 
     if (sid && lugarSectorExistente.value) {
       const opt = lugarSectorExistente.selectedOptions[0];
       if (opt && opt.hidden) lugarSectorExistente.value = "";
     }
+
+    // dibujar padre mientras creas contenedor (opcional)
+    const parent = sectorGeomById[String(sid)];
+    if (parent) setParentGeom(parent);
   }
 
-  // ========= Lugar: cargar pisos y luego lugares =========
   async function loadPisosForUbic(ubicId) {
     if (!lugarPiso) return;
     lugarPiso.innerHTML = `<option value="">-- seleccionar --</option>`;
@@ -293,6 +294,7 @@
 
   if (tipoRegistro) tipoRegistro.addEventListener("change", updateBloques);
   if (sectorParaUbicacion) sectorParaUbicacion.addEventListener("change", filterUbicacionesBySector);
+
   if (lugarSectorSector) lugarSectorSector.addEventListener("change", filterLugaresMovilesBySector);
 
   if (lugarUbicacion) {
@@ -300,6 +302,9 @@
       const uid = lugarUbicacion.value;
       await loadPisosForUbic(uid);
       await loadLugaresForPiso("");
+      // dibujar padre ubicación (si tiene geom)
+      const parent = ubicGeomById[String(uid)];
+      if (parent) setParentGeom(parent);
     });
   }
   if (lugarPiso) {
@@ -308,7 +313,6 @@
     });
   }
 
-  // ========= DIBUJO =========
   let points = [];
   let marking = false;
 
@@ -407,7 +411,6 @@
     } catch (e) {}
   }
 
-  // ========= VALIDACIÓN: dentro del padre =========
   function validateWithinParent(geom) {
     if (!geom) return { ok: false, msg: "Geometría inválida." };
     if (typeof turf === "undefined") return { ok: true };
@@ -419,10 +422,8 @@
         const sid = parentSectorId?.value || "";
         const parentGeom = sectorGeomById[String(sid)];
         if (!parentGeom) return { ok: false, msg: "No encontré el polígono del Sector padre." };
-
         const parent = { type: "Feature", geometry: parentGeom, properties: {} };
-        const ok = turf.booleanWithin(child, parent);
-        return ok ? { ok: true } : { ok: false, msg: "Debe quedar completamente dentro del Sector (padre)." };
+        return turf.booleanWithin(child, parent) ? { ok: true } : { ok: false, msg: "Debe quedar completamente dentro del Sector (padre)." };
       }
 
       if (editarTipo === "lugar") {
@@ -432,16 +433,13 @@
         const parentGeomU = ubicGeomById[String(uid)];
         if (parentGeomU) {
           const parent = { type: "Feature", geometry: parentGeomU, properties: {} };
-          const ok = turf.booleanWithin(child, parent);
-          return ok ? { ok: true } : { ok: false, msg: "El Lugar debe quedar completamente dentro de la Ubicación (padre)." };
+          return turf.booleanWithin(child, parent) ? { ok: true } : { ok: false, msg: "El Lugar debe quedar completamente dentro de la Ubicación (padre)." };
         }
 
         const parentGeomS = sectorGeomById[String(sid)];
         if (!parentGeomS) return { ok: false, msg: "No encontré el polígono del Sector padre." };
-
         const parent = { type: "Feature", geometry: parentGeomS, properties: {} };
-        const ok = turf.booleanWithin(child, parent);
-        return ok ? { ok: true } : { ok: false, msg: "El contenedor debe quedar completamente dentro del Sector (padre)." };
+        return turf.booleanWithin(child, parent) ? { ok: true } : { ok: false, msg: "El contenedor debe quedar completamente dentro del Sector (padre)." };
       }
 
       return { ok: true };
@@ -453,36 +451,29 @@
       const sid = sectorParaUbicacion?.value || "";
       const parentGeom = sectorGeomById[String(sid)];
       if (!parentGeom) return { ok: false, msg: "El Sector seleccionado NO tiene polígono. Primero dibuja el Sector." };
-
       const parent = { type: "Feature", geometry: parentGeom, properties: {} };
-      const ok = turf.booleanWithin(child, parent);
-      return ok ? { ok: true } : { ok: false, msg: "La Ubicación debe quedar completamente dentro del Sector seleccionado." };
+      return turf.booleanWithin(child, parent) ? { ok: true } : { ok: false, msg: "La Ubicación debe quedar completamente dentro del Sector seleccionado." };
     }
 
     if (tr === "lugar") {
       const uid = lugarUbicacion?.value || "";
       const parentGeom = ubicGeomById[String(uid)];
       if (!parentGeom) return { ok: false, msg: "La Ubicación seleccionada NO tiene polígono. Primero dibuja la Ubicación." };
-
       const parent = { type: "Feature", geometry: parentGeom, properties: {} };
-      const ok = turf.booleanWithin(child, parent);
-      return ok ? { ok: true } : { ok: false, msg: "El Lugar debe quedar completamente dentro de la Ubicación seleccionada." };
+      return turf.booleanWithin(child, parent) ? { ok: true } : { ok: false, msg: "El Lugar debe quedar completamente dentro de la Ubicación seleccionada." };
     }
 
     if (tr === "lugar_sector") {
       const sid = lugarSectorSector?.value || "";
       const parentGeom = sectorGeomById[String(sid)];
       if (!parentGeom) return { ok: false, msg: "El Sector seleccionado NO tiene polígono. Primero dibuja el Sector." };
-
       const parent = { type: "Feature", geometry: parentGeom, properties: {} };
-      const ok = turf.booleanWithin(child, parent);
-      return ok ? { ok: true } : { ok: false, msg: "El contenedor debe quedar completamente dentro del Sector seleccionado." };
+      return turf.booleanWithin(child, parent) ? { ok: true } : { ok: false, msg: "El contenedor debe quedar completamente dentro del Sector seleccionado." };
     }
 
     return { ok: true };
   }
 
-  // ========= MAP LOAD =========
   map.on("load", () => {
     addSavedOverlay();
     ensureDrawLayers();
@@ -523,10 +514,16 @@
   if (btnListo) {
     btnListo.addEventListener("click", () => {
       const geom = polygonGeometry();
-      if (!geom) return showError("Debes marcar al menos 3 puntos para formar un polígono.");
+      if (!geom) {
+        showError("Debes marcar al menos 3 puntos para formar un polígono.");
+        return;
+      }
 
       const v = validateWithinParent(geom);
-      if (!v.ok) return showError(v.msg);
+      if (!v.ok) {
+        showError(v.msg);
+        return;
+      }
 
       if (geomInput) geomInput.value = JSON.stringify(geom);
       if (modalGuardar) modalGuardar.show();

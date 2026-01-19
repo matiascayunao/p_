@@ -271,6 +271,24 @@ except Exception:
     from django.db.models.deletion import ProtectedError
     RestrictedError = ProtectedError
 
+def _is_movil_lugar(l) -> bool:
+    """
+    Heurística sin tocar modelos:
+    - Piso == 0
+    - Ubicación contiene 'MODULOS MOVILES'
+    """
+    try:
+        if not l or not getattr(l, "piso", None):
+            return False
+        if int(getattr(l.piso, "piso", 999999)) != 0:
+            return False
+        u = getattr(l.piso, "ubicacion", None)
+        if not u:
+            return False
+        return "MODULOS MOVILES" in (u.ubicacion or "").upper()
+    except Exception:
+        return False
+
 
 def _confirm_delete(request, obj, cancel_url_name, cancel_kwargs, success_url_name):
     cancel_url = reverse(cancel_url_name, kwargs=cancel_kwargs)
@@ -2094,14 +2112,24 @@ def _feature(kind, obj, geom, extra_props=None):
 @login_required
 def mapa_editor_crear(request):
     sectores = Sector.objects.all().order_by("sector")
-    ubicaciones = Ubicacion.objects.select_related("sector").all().order_by("ubicacion")
+    ubicaciones = Ubicacion.objects.select_related("sector").all().order_by("sector__sector", "ubicacion")
+
+    lugares_movil = (
+        Lugar.objects.select_related("piso__ubicacion__sector", "lugar_tipo_lugar")
+        .filter(piso__piso=0, piso__ubicacion__ubicacion__icontains="MODULOS MOVILES")
+        .order_by("piso__ubicacion__sector__sector", "nombre_del_lugar")
+    )
+    tipos_lugar = TipoLugar.objects.all().order_by("tipo_de_lugar")
 
     return render(
         request,
         "mapa/mapa_editor.html",
         {
+            "modo": "crear",
             "sectores": sectores,
             "ubicaciones": ubicaciones,
+            "lugares_movil": lugares_movil,
+            "tipos_lugar": tipos_lugar,
             "mapa_geojson": construir_geojson_para_mapa(),
         },
     )
@@ -2130,34 +2158,11 @@ def mapa_sector_editar_geom(request, sector_id):
 
 
 @login_required
-def mapa_ubicacion_editar_geom(request, ubicacion_id):
-    u = get_object_or_404(Ubicacion, pk=ubicacion_id)
-    sectores = Sector.objects.order_by("sector")
-    ubicaciones = Ubicacion.objects.select_related("sector").order_by("sector__sector", "ubicacion")
-
-    return render(
-        request,
-        "mapa/mapa_editor.html",
-        {
-            "modo": "editar",
-            "sectores": sectores,
-            "ubicaciones": ubicaciones,
-            "editar_tipo": "ubicacion",
-            "editar_id": u.id,
-            "obj_label": f"Ubicación: {u.ubicacion} (Sector {u.sector.sector})",
-            "geom_inicial": u.geom,
-            "parent_sector_id": u.sector_id, # ✅ CLAVE
-            "mapa_geojson": construir_geojson_para_mapa(),
-        },
-    )
-
-
-@login_required
 def mapa_sector_detalle(request, sector_id):
     sector = get_object_or_404(Sector, pk=sector_id)
     geom = sector.geom
 
-    # ubicaciones con polígono dentro del sector
+    # UBICACIONES CON POLÍGONO
     ubic_qs = (
         Ubicacion.objects.select_related("sector")
         .filter(sector_id=sector.id)
@@ -2165,8 +2170,8 @@ def mapa_sector_detalle(request, sector_id):
         .order_by("ubicacion")
     )
 
-    # stats por ubicacion (CORRECTO)
-    rows = (
+    # STATS POR UBICACION (dentro del sector)
+    ubic_rows = (
         ObjetoLugar.objects
         .filter(lugar__isnull=False, lugar__piso__ubicacion__sector_id=sector.id)
         .values("lugar__piso__ubicacion_id")
@@ -2177,45 +2182,114 @@ def mapa_sector_detalle(request, sector_id):
             malas=Sum("cantidad", filter=Q(estado="M")),
         )
     )
-    stats = _stats_dict_from_rows(rows, "lugar__piso__ubicacion_id")
+    stats_ubic = _stats_dict_from_rows(ubic_rows, "lugar__piso__ubicacion_id")
 
-    ubic_features = []
+    # LUGARES MÓVILES CON POLÍGONO (en el sector)
+    todos_lugares_sector = (
+        Lugar.objects.select_related("piso__ubicacion__sector", "lugar_tipo_lugar")
+        .filter(piso__ubicacion__sector_id=sector.id)
+        .exclude(geom__isnull=True)
+    )
+    moviles = [l for l in todos_lugares_sector if _is_movil_lugar(l)]
+    moviles.sort(key=lambda x: (x.nombre_del_lugar or "").lower())
+
+    # STATS POR LUGAR (para móviles)
+    lugar_rows = (
+        ObjetoLugar.objects
+        .filter(lugar__isnull=False, lugar__piso__ubicacion__sector_id=sector.id)
+        .values("lugar_id")
+        .annotate(
+            total=Sum("cantidad"),
+            buenas=Sum("cantidad", filter=Q(estado="B")),
+            pendientes=Sum("cantidad", filter=Q(estado="P")),
+            malas=Sum("cantidad", filter=Q(estado="M")),
+        )
+    )
+    stats_lugar = _stats_dict_from_rows(lugar_rows, "lugar_id")
+
+    features = []
+
+    # UBICACIONES
     for u in ubic_qs:
-        st = stats.get(str(u.id))
+        st = stats_ubic.get(str(u.id))
         hasPct = bool(st and st["hasPct"])
-
-        ubic_features.append({
+        features.append({
             "type": "Feature",
             "geometry": u.geom,
             "properties": {
+                "kind": "ubicacion",
                 "id": u.id,
                 "name": u.ubicacion,
+                "sector_id": sector.id,
                 "sector_name": sector.sector,
-
                 "hasPct": hasPct,
-                "pct": st["pct_buenas"] if hasPct else 0,
-
+                "pct": st["pct_buenas"] if hasPct else None,
                 "total": st["total"] if st else 0,
                 "buenas": st["buenas"] if st else 0,
                 "pendientes": st["pendientes"] if st else 0,
                 "malas": st["malas"] if st else 0,
-
                 "pct_buenas": st["pct_buenas"] if st else 0,
                 "pct_pendientes": st["pct_pendientes"] if st else 0,
                 "pct_malas": st["pct_malas"] if st else 0,
-
                 "detail_url": reverse("mapa_ubicacion_detalle", kwargs={"ubicacion_id": u.id}),
                 "edit_geom_url": reverse("mapa_ubicacion_editar_geom", kwargs={"ubicacion_id": u.id}),
             },
         })
 
-    ubic_fc = {"type": "FeatureCollection", "features": ubic_features}
+    # MÓVILES (LUGARES)
+    for l in moviles:
+        st = stats_lugar.get(str(l.id))
+        hasPct = bool(st and st["hasPct"])
+        features.append({
+            "type": "Feature",
+            "geometry": l.geom,
+            "properties": {
+                "kind": "lugar",
+                "is_movil": True,
+                "id": l.id,
+                "name": l.nombre_del_lugar,
+                "sector_id": sector.id,
+                "sector_name": sector.sector,
+                "ubicacion_id": l.piso.ubicacion_id,
+                "ubicacion_name": l.piso.ubicacion.ubicacion,
+                "piso": int(l.piso.piso),
+                "tipo_lugar": getattr(l.lugar_tipo_lugar, "tipo_de_lugar", ""),
+                "hasPct": hasPct,
+                "pct": st["pct_buenas"] if hasPct else None,
+                "total": st["total"] if st else 0,
+                "buenas": st["buenas"] if st else 0,
+                "pendientes": st["pendientes"] if st else 0,
+                "malas": st["malas"] if st else 0,
+                "pct_buenas": st["pct_buenas"] if st else 0,
+                "pct_pendientes": st["pct_pendientes"] if st else 0,
+                "pct_malas": st["pct_malas"] if st else 0,
+                "detail_url": reverse("detalle_lugar", kwargs={"lugar_id": l.id}),
+                "edit_geom_url": reverse("mapa_lugar_editar_geom", kwargs={"lugar_id": l.id}),
+            },
+        })
+
+    ubic_fc = {"type": "FeatureCollection", "features": features} # ✅ DEJO EL NOMBRE ubic_fc PARA TU TEMPLATE
 
     return render(request, "mapa/mapa_sector_detalle.html", {
         "sector": sector,
         "geom": geom,
         "ubic_fc": ubic_fc,
     })
+
+
+def _stats_lugar_dict():
+    rows = (
+        ObjetoLugar.objects
+        .filter(lugar__isnull=False)
+        .values("lugar_id")
+        .annotate(
+            total=Sum("cantidad"),
+            buenas=Sum(Case(When(estado="B", then=F("cantidad")), default=Value(0), output_field=IntegerField())),
+            pendientes=Sum(Case(When(estado="P", then=F("cantidad")), default=Value(0), output_field=IntegerField())),
+            malas=Sum(Case(When(estado="M", then=F("cantidad")), default=Value(0), output_field=IntegerField())),
+        )
+    )
+    return _stats_dict_from_rows(rows, "lugar_id")
 
 
 def _stats_dict_from_rows(rows, key_field: str):
@@ -2247,7 +2321,29 @@ def _stats_dict_from_rows(rows, key_field: str):
             "hasPct": hasPct,
         }
     return out
-    
+
+@login_required
+def mapa_ubicacion_editar_geom(request, ubicacion_id):
+    u = get_object_or_404(Ubicacion.objects.select_related("sector"), pk=ubicacion_id)
+    sectores = Sector.objects.order_by("sector")
+    ubicaciones = Ubicacion.objects.select_related("sector").order_by("sector__sector", "ubicacion")
+
+    return render(
+        request,
+        "mapa/mapa_editor.html",
+        {
+            "modo": "editar",
+            "sectores": sectores,
+            "ubicaciones": ubicaciones,
+            "editar_tipo": "ubicacion",
+            "editar_id": u.id,
+            "obj_label": f"Ubicación: {u.ubicacion} (Sector {u.sector.sector})",
+            "geom_inicial": u.geom,
+            "parent_sector_id": u.sector_id, # ✅ CLAVE
+            "mapa_geojson": construir_geojson_para_mapa(),
+        },
+    )
+
 @login_required
 def mapa_ubicacion_detalle(request, ubicacion_id):
     ubicacion = get_object_or_404(Ubicacion.objects.select_related("sector"), pk=ubicacion_id)
@@ -2289,7 +2385,6 @@ def mapa_ubicacion_detalle(request, ubicacion_id):
 
     pisos = Piso.objects.filter(ubicacion_id=ubicacion.id).order_by("piso")
 
-    # stats por piso
     piso_rows = (
         base.values("lugar__piso_id")
         .annotate(
@@ -2301,7 +2396,6 @@ def mapa_ubicacion_detalle(request, ubicacion_id):
     )
     piso_stats = _stats_dict_from_rows(piso_rows, "lugar__piso_id")
 
-    # stats por lugar
     lugar_rows = (
         base.values("lugar_id")
         .annotate(
@@ -2360,8 +2454,9 @@ def mapa_ubicacion_detalle(request, ubicacion_id):
 
     lugares_features = []
     for l in lugares_qs:
-        st = lugar_stats.get(str(l.id),{
-            "total": 0, "buenas":0,"pendientes":0,"malas": 0, "pct_buenas":0, "pct_pendientes":0, "pct_malas": 0, "hasPct": False
+        st = lugar_stats.get(str(l.id), {
+            "total": 0, "buenas": 0, "pendientes": 0, "malas": 0,
+            "pct_buenas": 0, "pct_pendientes": 0, "pct_malas": 0, "hasPct": False
         })
         lugares_features.append({
             "type": "Feature",
@@ -2373,9 +2468,9 @@ def mapa_ubicacion_detalle(request, ubicacion_id):
                 "hasPct": bool(st.get("hasPct")),
                 "pct_buenas": float(st.get("pct_buenas") or 0),
                 "pct_pendientes": float(st.get("pct_pendientes") or 0),
-                "pct_malas":float(st.get("pct_malas") or 0),
+                "pct_malas": float(st.get("pct_malas") or 0),
                 "total": int(st.get("total") or 0),
-                "buenas": int(st.get("buenas")or 0),
+                "buenas": int(st.get("buenas") or 0),
                 "pendientes": int(st.get("pendientes") or 0),
                 "malas": int(st.get("malas") or 0),
                 "detail_url": reverse("detalle_lugar", kwargs={"lugar_id": l.id}),
@@ -2388,7 +2483,7 @@ def mapa_ubicacion_detalle(request, ubicacion_id):
     return render(request, "mapa/mapa_ubicacion_detalle.html", {
         "ubicacion": ubicacion,
         "geom": geom,
-        "lugares_fc": lugares_fc, 
+        "lugares_fc": lugares_fc,
         "resumen": resumen,
         "pisos_info": pisos_info,
         "url_detalle_ubicacion": reverse("detalle_ubicacion", kwargs={"ubicacion_id": ubicacion.id}),
@@ -2396,7 +2491,6 @@ def mapa_ubicacion_detalle(request, ubicacion_id):
         "url_lista_lugares": f"{reverse('lista_lugares')}?ubicacion={ubicacion.id}",
         "url_lista_objetos_lugar": reverse("lista_objetos_lugar"),
     })
-
 
 @require_POST
 @login_required
@@ -2446,27 +2540,32 @@ def mapa_guardar(request):
             return redirect("mapa_ubicacion_detalle", ubicacion_id=u.id)
 
         if editar_tipo == "lugar":
-            l = get_object_or_404(Lugar.objects.select_related("piso__ubicacion"), pk=editar_id)
+            l = get_object_or_404(Lugar.objects.select_related("piso__ubicacion__sector"), pk=editar_id)
 
-            parent_geom = l.piso.ubicacion.geom
-            if not parent_geom:
-                messages.error(request, "La Ubicación padre no tiene polígono. Primero dibuja la Ubicación.")
-                return redirect("mapa_lugar_editar_geom", lugar_id=l.id)
-
-            if not _geom_within_parent(geom, parent_geom):
-                messages.error(request, "El polígono del Lugar debe quedar completamente dentro de la Ubicación.")
-                return redirect("mapa_lugar_editar_geom", lugar_id=l.id)
+            parent_ubic_geom = l.piso.ubicacion.geom
+            if parent_ubic_geom:
+                if not _geom_within_parent(geom, parent_ubic_geom):
+                    messages.error(request, "El Lugar debe quedar completamente dentro de la Ubicación (padre).")
+                    return redirect("mapa_lugar_editar_geom", lugar_id=l.id)
+            else:
+                parent_sector_geom = l.piso.ubicacion.sector.geom
+                if not parent_sector_geom:
+                    messages.error(request, "El Sector padre no tiene polígono. Primero dibuja el Sector.")
+                    return redirect("mapa_lugar_editar_geom", lugar_id=l.id)
+                if not _geom_within_parent(geom, parent_sector_geom):
+                    messages.error(request, "El contenedor debe quedar completamente dentro del Sector (padre).")
+                    return redirect("mapa_lugar_editar_geom", lugar_id=l.id)
 
             l.geom = geom
             l.save()
-            return redirect("mapa_ubicacion_detalle", lugar_id=l.id)
+            return redirect("detalle_lugar", lugar_id=l.id)
 
         return redirect("mapa_admin")
 
     # ========= CREAR =========
-    tipo_registro = request.POST.get("tipo_registro", "sector") # sector | ubicacion | lugar
+    tipo_registro = request.POST.get("tipo_registro", "sector") # sector | ubicacion | lugar | lugar_sector
 
-    # ======= CREAR LUGAR =======
+    # ======= CREAR LUGAR NORMAL =======
     if tipo_registro == "lugar":
         ubicacion_id = (request.POST.get("lugar_ubicacion") or "").strip()
         lugar_id = (request.POST.get("lugar_id") or "").strip()
@@ -2494,17 +2593,63 @@ def mapa_guardar(request):
         l.save()
         return redirect("detalle_lugar", lugar_id=l.id)
 
+    # ======= CREAR / ACTUALIZAR LUGAR MÓVIL (DIRECTO EN SECTOR) =======
+    if tipo_registro == "lugar_sector":
+        sid = (request.POST.get("lugar_sector_sector") or "").strip()
+        if not sid.isdigit():
+            messages.error(request, "Debes seleccionar un Sector.")
+            return redirect("mapa_crear")
+
+        sector = get_object_or_404(Sector, pk=int(sid))
+        if not sector.geom:
+            messages.error(request, "El Sector seleccionado NO tiene polígono. Primero dibuja el Sector.")
+            return redirect("mapa_crear")
+
+        if not _geom_within_parent(geom, sector.geom):
+            messages.error(request, "El contenedor debe quedar completamente dentro del Sector seleccionado.")
+            return redirect("mapa_crear")
+
+        lugar_sector_id = (request.POST.get("lugar_sector_id") or "").strip()
+        if lugar_sector_id.isdigit():
+            l = get_object_or_404(Lugar.objects.select_related("piso__ubicacion__sector"), pk=int(lugar_sector_id))
+            if l.piso.ubicacion.sector_id != sector.id:
+                messages.error(request, "Ese lugar móvil no pertenece al Sector seleccionado.")
+                return redirect("mapa_crear")
+            l.geom = geom
+            l.save()
+            return redirect("detalle_lugar", lugar_id=l.id)
+
+        nombre = (request.POST.get("lugar_sector_nuevo") or "").strip()
+        tipo_lugar_id = (request.POST.get("lugar_sector_tipo_lugar") or "").strip()
+
+        if not nombre:
+            messages.error(request, "Debes escribir el nombre del lugar móvil.")
+            return redirect("mapa_crear")
+        if not tipo_lugar_id.isdigit():
+            messages.error(request, "Debes seleccionar Tipo de lugar.")
+            return redirect("mapa_crear")
+
+        tipo_lugar = get_object_or_404(TipoLugar, pk=int(tipo_lugar_id))
+        ubi_mov = _get_or_create_ubicacion_moviles(sector)
+        piso_mov = _get_or_create_piso_movil(ubi_mov)
+
+        l, _ = Lugar.objects.get_or_create(
+            piso=piso_mov,
+            lugar_tipo_lugar=tipo_lugar,
+            nombre_del_lugar=nombre,
+        )
+        l.geom = geom
+        l.save()
+        return redirect("detalle_lugar", lugar_id=l.id)
+
     # ======= CREAR SECTOR =======
     if tipo_registro == "sector":
         sector_existente = request.POST.get("sector_existente", "").strip()
         sector_nuevo = (request.POST.get("sector_nuevo") or "").strip()
 
         sector_obj = None
-        if sector_existente:
-            try:
-                sector_obj = Sector.objects.get(pk=int(sector_existente))
-            except Exception:
-                sector_obj = None
+        if sector_existente and sector_existente.isdigit():
+            sector_obj = Sector.objects.filter(pk=int(sector_existente)).first()
 
         if not sector_obj and sector_nuevo:
             sector_obj, _ = Sector.objects.get_or_create(sector=sector_nuevo)
@@ -2517,36 +2662,35 @@ def mapa_guardar(request):
         return redirect("mapa_sector_detalle", sector_id=sector_obj.id)
 
     # ======= CREAR UBICACION =======
-    sector_id = request.POST.get("sector_para_ubicacion", "").strip()
-    try:
-        sector_obj = Sector.objects.get(pk=int(sector_id))
-    except Exception:
+    sector_id = (request.POST.get("sector_para_ubicacion") or "").strip()
+    if not sector_id.isdigit():
         return redirect("mapa_crear")
+
+    sector_obj = get_object_or_404(Sector, pk=int(sector_id))
 
     if not sector_obj.geom:
         messages.error(request, "El Sector seleccionado no tiene polígono. Primero dibuja el Sector.")
         return redirect("mapa_crear")
 
-    # ✅ validación Ubicación ⊂ Sector
     if not _geom_within_parent(geom, sector_obj.geom):
         messages.error(request, "La Ubicación debe quedar completamente dentro del Sector seleccionado.")
         return redirect("mapa_crear")
 
-    ubicacion_existente = request.POST.get("ubicacion_existente", "").strip()
+    ubicacion_existente = (request.POST.get("ubicacion_existente") or "").strip()
     ubicacion_nueva = (request.POST.get("ubicacion_nueva") or "").strip()
 
     ubic_obj = None
-    if ubicacion_existente:
-        try:
-            ubic_obj = Ubicacion.objects.get(pk=int(ubicacion_existente))
-        except Exception:
-            ubic_obj = None
+    if ubicacion_existente and ubicacion_existente.isdigit():
+        ubic_obj = Ubicacion.objects.filter(pk=int(ubicacion_existente)).first()
 
     if not ubic_obj and ubicacion_nueva:
         ubic_obj, _ = Ubicacion.objects.get_or_create(
             ubicacion=ubicacion_nueva,
             defaults={"sector": sector_obj},
         )
+        if ubic_obj.sector_id != sector_obj.id:
+            ubic_obj.sector = sector_obj
+            ubic_obj.save(update_fields=["sector"])
 
     if not ubic_obj:
         return redirect("mapa_crear")
@@ -2554,7 +2698,6 @@ def mapa_guardar(request):
     ubic_obj.geom = geom
     ubic_obj.save()
     return redirect("mapa_ubicacion_detalle", ubicacion_id=ubic_obj.id)
-
 
 @login_required
 def mapa_sector_quitar_geom(request, sector_id):
@@ -2567,7 +2710,6 @@ def mapa_sector_quitar_geom(request, sector_id):
     cancel_url = reverse("mapa_sector_detalle", kwargs={"sector_id": s.id})
     return render(request, "mapa/confirm_quitar_geom.html", {"obj": s, "cancel_url": cancel_url})
 
-
 @login_required
 def mapa_ubicacion_quitar_geom(request, ubicacion_id):
     u = get_object_or_404(Ubicacion, pk=ubicacion_id)
@@ -2579,7 +2721,16 @@ def mapa_ubicacion_quitar_geom(request, ubicacion_id):
     cancel_url = reverse("mapa_ubicacion_detalle", kwargs={"ubicacion_id": u.id})
     return render(request, "mapa/confirm_quitar_geom.html", {"obj": u, "cancel_url": cancel_url})
 
+@login_required
+def mapa_lugar_quitar_geom(request, lugar_id):
+    l = get_object_or_404(Lugar, pk=lugar_id)
+    if request.method == "POST":
+        l.geom = None
+        l.save()
+        return redirect("detalle_lugar", lugar_id=l.id)
 
+    cancel_url = reverse("detalle_lugar", kwargs={"lugar_id": l.id})
+    return render(request, "mapa/confirm_quitar_geom.html", {"obj": l, "cancel_url": cancel_url})
 
 def _color_por_pct_buenas(pct):
     if pct is None:
@@ -2612,32 +2763,7 @@ def _stats_sector_dict():
             malas=Sum(Case(When(estado="M", then=F("cantidad")), default=Value(0), output_field=IntegerField())),
         )
     )
-
-    out = {}
-    for r in rows:
-        sid = r["lugar__piso__ubicacion__sector_id"]
-        total = int(r["total"] or 0)
-        buenas = int(r["buenas"] or 0)
-        pendientes = int(r["pendientes"] or 0)
-        malas = int(r["malas"] or 0)
-
-        if total > 0:
-            pct_b = round((buenas * 100.0) / total, 1)
-            pct_p = round((pendientes * 100.0) / total, 1)
-            pct_m = round((malas * 100.0) / total, 1)
-        else:
-            pct_b = pct_p = pct_m = 0.0
-
-        out[str(sid)] = {
-            "total": total,
-            "buenas": buenas,
-            "pendientes": pendientes,
-            "malas": malas,
-            "pct_buenas": pct_b,
-            "pct_pendientes": pct_p,
-            "pct_malas": pct_m,
-        }
-    return out
+    return _stats_dict_from_rows(rows, "lugar__piso__ubicacion__sector_id")
 
 
 def _stats_ubicacion_dict():
@@ -2652,32 +2778,7 @@ def _stats_ubicacion_dict():
             malas=Sum(Case(When(estado="M", then=F("cantidad")), default=Value(0), output_field=IntegerField())),
         )
     )
-
-    out = {}
-    for r in rows:
-        uid = r["lugar__piso__ubicacion_id"]
-        total = int(r["total"] or 0)
-        buenas = int(r["buenas"] or 0)
-        pendientes = int(r["pendientes"] or 0)
-        malas = int(r["malas"] or 0)
-
-        if total > 0:
-            pct_b = round((buenas * 100.0) / total, 1)
-            pct_p = round((pendientes * 100.0) / total, 1)
-            pct_m = round((malas * 100.0) / total, 1)
-        else:
-            pct_b = pct_p = pct_m = 0.0
-
-        out[str(uid)] = {
-            "total": total,
-            "buenas": buenas,
-            "pendientes": pendientes,
-            "malas": malas,
-            "pct_buenas": pct_b,
-            "pct_pendientes": pct_p,
-            "pct_malas": pct_m,
-        }
-    return out
+    return _stats_dict_from_rows(rows, "lugar__piso__ubicacion_id")
 
 
 def construir_geojson_para_mapa():
@@ -2720,18 +2821,23 @@ def construir_geojson_para_mapa():
         })
 
     # LUGARES
-    for l in Lugar.objects.select_related("piso__ubicacion__sector").all():
+    for l in Lugar.objects.select_related("piso__ubicacion__sector", "lugar_tipo_lugar").all():
         if not l.geom:
             continue
+        u = l.piso.ubicacion
         features.append({
             "type": "Feature",
             "geometry": l.geom,
             "properties": {
                 "kind": "lugar",
                 "id": l.id,
-                "ubicacion_id": l.piso.ubicacion_id,
-                "sector_id": l.piso.ubicacion.sector_id,
-                "sector_name": l.piso.ubicacion.sector.sector,
+                "ubicacion_id": u.id,
+                "ubicacion_name": u.ubicacion,
+                "sector_id": u.sector_id,
+                "sector_name": u.sector.sector,
+                "piso": int(l.piso.piso),
+                "is_movil": bool(_is_movil_lugar(l)),
+                "tipo_lugar": getattr(l.lugar_tipo_lugar, "tipo_de_lugar", ""),
                 "name": l.nombre_del_lugar,
                 "detail_url": reverse("detalle_lugar", kwargs={"lugar_id": l.id}),
                 "edit_geom_url": reverse("mapa_lugar_editar_geom", kwargs={"lugar_id": l.id}),
@@ -2739,7 +2845,6 @@ def construir_geojson_para_mapa():
         })
 
     return {"type": "FeatureCollection", "features": features}
-
 
 @login_required
 def mapa_admin(request):
@@ -2750,15 +2855,14 @@ def mapa_admin(request):
     }
     return render(request, "mapa/mapa_admin.html", context)
 
-
 @require_GET
 @login_required
 def mapa_admin_stats(request):
     return JsonResponse({
         "sector": _stats_sector_dict(),
         "ubicacion": _stats_ubicacion_dict(),
+        "lugar": _stats_lugar_dict(), # ✅ CLAVE (para que BAÑO RODANTE NO SALGA “SIN DATOS”)
     })
-
 # =========================
 # Helpers: parsing Excel
 # =========================
@@ -3052,7 +3156,15 @@ def _get_model(name: str):
         return apps.get_model(APP_LABEL, name)
     except LookupError:
         return None
+    
+def _get_or_create_ubicacion_moviles(sector: Sector) -> Ubicacion:
+    nombre = f"MODULOS MOVILES - {sector.sector}"
+    ubic, _ = Ubicacion.objects.get_or_create(sector=sector, ubicacion=nombre)
+    return ubic
 
+def _get_or_create_piso_movil(ubic: Ubicacion) -> Piso:
+    piso, _ = Piso.objects.get_or_create(ubicacion=ubic, piso=0)
+    return piso
 
 def _field_names(model):
     return {f.name for f in model._meta.get_fields()}
@@ -3463,15 +3575,10 @@ def _geom_within_parent(child_geom, parent_geom):
 
 @login_required
 def mapa_lugar_editar_geom(request, lugar_id):
-    l = get_object_or_404(
-        Lugar.objects.select_related("piso__ubicacion__sector"),
-        pk=lugar_id
-    )
+    l = get_object_or_404(Lugar.objects.select_related("piso__ubicacion__sector"), pk=lugar_id)
 
     sectores = Sector.objects.order_by("sector")
     ubicaciones = Ubicacion.objects.select_related("sector").order_by("sector__sector", "ubicacion")
-
-    parent_ubicacion_id = l.piso.ubicacion_id
 
     return render(
         request,
@@ -3482,9 +3589,10 @@ def mapa_lugar_editar_geom(request, lugar_id):
             "ubicaciones": ubicaciones,
             "editar_tipo": "lugar",
             "editar_id": l.id,
-            "obj_label": f"Lugar: {l.nombre_del_lugar} (Ubicación {l.piso.ubicacion.ubicacion})",
+            "obj_label": f"Lugar: {l.nombre_del_lugar}",
             "geom_inicial": l.geom,
-            "parent_ubicacion_id": parent_ubicacion_id, # ✅ CLAVE
+            "parent_ubicacion_id": l.piso.ubicacion_id, # normal
+            "parent_sector_id": l.piso.ubicacion.sector_id, # móvil (si ubic geom es null)
             "mapa_geojson": construir_geojson_para_mapa(),
         },
     )
