@@ -3158,7 +3158,7 @@ def _get_model(name: str):
         return None
     
 def _get_or_create_ubicacion_moviles(sector: Sector) -> Ubicacion:
-    nombre = f"MODULOS MOVILES - {sector.sector}"
+    nombre = f"MODULOS - {sector.sector}"
     ubic, _ = Ubicacion.objects.get_or_create(sector=sector, ubicacion=nombre)
     return ubic
 
