@@ -1,3 +1,4 @@
+{# templates/mapa/mapa_editor.html #}
 {% extends "base.html" %}
 {% load static %}
 
@@ -71,6 +72,7 @@
                 <option value="sector">Sector</option>
                 <option value="ubicacion">Ubicación</option>
                 <option value="lugar">Lugar</option>
+                <option value="lugar_sector">Lugar móvil (directo en Sector)</option>
               </select>
             </div>
 
@@ -126,7 +128,7 @@
               <div class="small text-muted mt-2">La lista de ubicaciones se filtra por el sector seleccionado.</div>
             </div>
 
-            <!-- Lugar -->
+            <!-- Lugar normal -->
             <div id="bloqueLugar" class="border rounded p-3 mb-3" style="display:none;">
               <div class="row g-2">
                 <div class="col-md-6">
@@ -160,6 +162,57 @@
                 </div>
               </div>
             </div>
+
+            <!-- Lugar móvil directo en Sector -->
+            <div id="bloqueLugarSector" class="border rounded p-3 mb-3" style="display:none;">
+              <div class="row g-2">
+
+                <div class="col-md-6">
+                  <label class="form-label">Sector (padre)</label>
+                  <select class="form-select" name="lugar_sector_sector" id="lugarSectorSector">
+                    <option value="">-- seleccionar --</option>
+                    {% for s in sectores %}
+                      <option value="{{ s.id }}">{{ s.sector }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="small text-muted mt-1">
+                    El polígono del móvil debe quedar dentro del Sector seleccionado.
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">Lugar móvil existente (opcional)</label>
+                  <select class="form-select" name="lugar_sector_id" id="lugarSectorExistente">
+                    <option value="">-- seleccionar --</option>
+                    {% for l in lugares_movil %}
+                      <option value="{{ l.id }}" data-sector="{{ l.piso.ubicacion.sector_id }}">
+                        {{ l.nombre_del_lugar }} ({{ l.piso.ubicacion.sector.sector }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                  <div class="small text-muted mt-1">
+                    Se filtra por el sector seleccionado.
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">Nombre nuevo (si no eliges uno existente)</label>
+                  <input class="form-control" name="lugar_sector_nuevo" placeholder="Ej: Baño rodante 1">
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">Tipo de lugar</label>
+                  <select class="form-select" name="lugar_sector_tipo_lugar">
+                    <option value="">-- seleccionar --</option>
+                    {% for tl in tipos_lugar %}
+                      <option value="{{ tl.id }}">{{ tl.tipo_de_lugar }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+              </div>
+            </div>
+
           {% endif %}
 
         </div>
