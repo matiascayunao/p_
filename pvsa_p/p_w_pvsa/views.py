@@ -275,17 +275,35 @@ def _is_movil_lugar(l) -> bool:
     """
     Heurística sin tocar modelos:
     - Piso == 0
-    - Ubicación contiene 'MODULOS MOVILES'
+    - Ubicación corresponde a módulos móviles (ej: "MODULOS MOVILES ..." o "MODULOS - <Sector>")
     """
     try:
         if not l or not getattr(l, "piso", None):
             return False
+
         if int(getattr(l.piso, "piso", 999999)) != 0:
             return False
+
         u = getattr(l.piso, "ubicacion", None)
         if not u:
             return False
-        return "MODULOS MOVILES" in (u.ubicacion or "").upper()
+
+        # normaliza (sin tildes) y en mayúsculas
+        raw = (u.ubicacion or "")
+        norm = "".join(
+            c for c in unicodedata.normalize("NFD", raw)
+            if unicodedata.category(c) != "Mn"
+        ).upper().strip()
+
+        # acepta ambos formatos
+        if norm.startswith("MODULOS"):
+            return True
+        if "MODULOS MOVILES" in norm:
+            return True
+        if "MODULOS MOVIL" in norm or "MODULO MOVIL" in norm:
+            return True
+
+        return False
     except Exception:
         return False
 
@@ -2116,7 +2134,8 @@ def mapa_editor_crear(request):
 
     lugares_movil = (
         Lugar.objects.select_related("piso__ubicacion__sector", "lugar_tipo_lugar")
-        .filter(piso__piso=0, piso__ubicacion__ubicacion__icontains="MODULOS MOVILES")
+        .filter(piso__piso=0, piso__ubicacion__ubicacion__icontains="MODULOS")
+
         .order_by("piso__ubicacion__sector__sector", "nombre_del_lugar")
     )
     tipos_lugar = TipoLugar.objects.all().order_by("tipo_de_lugar")
